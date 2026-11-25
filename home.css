@@ -125,6 +125,26 @@ body #home-login #dashboard-b-access [data-b-logout]{color:var(--danger)}
 .quick-card.primary:hover{border-color:var(--accent)}
 .search-result{padding:16px 0 0;margin:0;font-size:var(--fs-base);color:var(--muted)}
 
+/* 小城入口沿用遊戲的森林綠色調 */
+.city-section{margin-top:8px}
+.city-card{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  color:#234935;
+  background:#f0f6ef;
+  border:1px solid #c5d9c7;
+  border-radius:var(--r-md);
+}
+.city-card:hover{background:#e7f1e6;border-color:#87aa8e}
+.city-icon{display:grid;place-items:center;width:40px;height:40px;background:#d9e9d9;border-radius:var(--r-sm)}
+.city-icon svg{width:24px;height:24px}
+.city-card h2{margin:0;font-size:1rem;line-height:1.3}
+.city-card p{margin:2px 0 0;font-size:.875rem;color:#45644d}
+.city-action{padding:6px 10px;border-radius:var(--r-sm);background:#285a3b;color:white;font-size:.875rem;font-weight:700}
+
 /* 分區導覽 */
 .section-nav{border-bottom:1px solid var(--line);background:rgba(255,255,255,.96);position:sticky;top:0;z-index:5;margin-top:8px}
 .section-nav .shell{display:flex;align-items:center;gap:4px}

@@ -46,7 +46,9 @@ test('home navigation retains PR179 performance and PR181 lab removal', () => {
     'threec-query.html'
   ]);
   assert.equal(cards(navigation('督導專區')).length, 9);
-  assert.equal(cards(html).length, 6 + staffHrefs.length + 9);
+  const city = cardFor(html, 'city-play.html');
+  assert.match(city, /data-search="[^"]*小城/);
+  assert.equal(cards(html).length, 6 + staffHrefs.length + 9 + 1);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
