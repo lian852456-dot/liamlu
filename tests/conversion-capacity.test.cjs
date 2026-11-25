@@ -57,3 +57,16 @@ test('對帳失敗只隱藏受影響區，缺分頁顯示原因',()=>{
  const result=analyze(b);assert.match(result.regions[0].issue,/核對/);assert.equal(result.regions[1].count,6);
  delete b.Sheets.RS_VoiceAQ;assert.match(analyze(b).issue,/缺少/);
 });
+
+test('門市提醒按合併後同筆資費和機型排行，只引用實際搭配的專案',()=>{
+ const b=details(),rows=b.Sheets.RS_VoiceAQ['!data'];
+ rows[1][4].v=1399;rows[1][6].v='測試 Pro_128G-(藍)(5G)';
+ rows[2][6].v='測試 Pro_256G-(紅)(5G)';rows[3][6]={t:'s',v:'測試 Pro Max_128G-(紅)(5G)'};
+ const u=analyze(b).overall;
+ assert.equal(u.high.fee,1399);assert.equal(u.high.products[0].name,'測試 Pro Max');
+ assert.deepEqual(u.common,{name:'測試 Pro',lo:2,hi:1});
+ assert.deepEqual(u.high.products[0].project,{name:'好速',n:3});
+ assert.doesNotMatch(JSON.stringify(mix.groups(u,'AQ')),/北一|日目標|缺口/);
+ assert.equal(analyze(b,false).overall.count,6);
+ b.Sheets.AQ量能['!data'][3][3].v=2;assert.ok(analyze(b).overall.issue);
+});

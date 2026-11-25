@@ -1,5 +1,5 @@
 'use strict';
-importScripts('assets/vendor/xlsx.full.min.js','readonly-dashboard-core.js','conversion-capacity-core.js','conversion-capacity-mix.js');
+importScripts('assets/vendor/xlsx.full.min.js','readonly-dashboard-core.js','conversion-capacity-core.js','conversion-capacity-mix.js?v=store-products-2');
 self.onmessage=async ({data})=>{
   try {
     let bytes=await data.file.arrayBuffer();
