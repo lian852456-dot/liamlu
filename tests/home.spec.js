@@ -184,6 +184,17 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:3
   test(`${viewport.width}px 無水平溢出且所有入口可見`, async ({page}) => {
     await start(page,{viewport}); await ready(page); await noOverflow(page);
     await expect(page.locator('a.card:visible')).toHaveCount(EXPECTED_HREFS.length);
+    const header = page.locator('.header-inner');
+    const city = header.getByRole('link',{name:'北一二B小城',exact:true});
+    await expect(city).toBeVisible();
+    await expect(city).toHaveAttribute('href','city-play.html');
+    const headerBox = await header.boundingBox();
+    const brandBox = await header.locator('.brand').boundingBox();
+    const cityBox = await city.boundingBox();
+    expect(cityBox.x + cityBox.width).toBeCloseTo(headerBox.x + headerBox.width, 0);
+    expect(cityBox.x).toBeGreaterThanOrEqual(brandBox.x + brandBox.width);
+    expect(cityBox.y).toBeLessThan(brandBox.y + brandBox.height);
+    expect(brandBox.y).toBeLessThan(cityBox.y + cityBox.height);
     const boxes = await page.locator('.quick-card').evaluateAll(cards => cards.map(card => card.getBoundingClientRect().toJSON()));
     const rowSizes = [...new Set(boxes.map(box => box.y))].map(y => boxes.filter(box => box.y === y).length);
     expect(rowSizes).toEqual(viewport.width >= 1280 ? [3, 3] : [2, 2, 2]);
