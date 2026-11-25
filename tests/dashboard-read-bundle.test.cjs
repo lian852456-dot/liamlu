@@ -159,7 +159,10 @@ test('battle-only view survives 30 minutes, restores and refreshes until exactly
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../GasBClient.js'),'utf8'),ctx);
  const client=battleView=>ctx.createDashboardBClient(url,{storage,battleView,now:()=>time});
  const view=client(true);assert.equal(view.restore(h.device).expiresAt,base+short);
+ const ledgerKey='DASHBOARD_AUTH_B_SESS_V1_'+h.login.token.split('_')[1];
+ const originalLedger=h.f.props.get(ledgerKey);
  const bundle=await view.readBundle();assert.equal(view.acceptBattleLease(bundle),base+day);
+ assert.equal(h.f.props.get(ledgerKey),originalLedger);
  time=base+day-1;
  assert.equal(client(false).restore(h.device),null);
  const restored=client(true);assert.equal(restored.restore(h.device).expiresAt,base+day);
