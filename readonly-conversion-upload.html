@@ -3,19 +3,19 @@
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f1f5f8;color:#173349;font:15px/1.45 system-ui,"PingFang TC",sans-serif}main{max-width:1040px;margin:12px auto;padding:0 16px;font-size:14px}.hero{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;background:#173e56;color:white;border-radius:12px;padding:8px 12px}.card{padding:10px 12px;margin-top:8px}h2{font-size:16px}input,button{min-height:34px;padding:6px 8px}.hero p,.hero details{margin:0;font-size:13px}.hero summary{cursor:pointer}.card{background:white;border:1px solid #d6e1e9;border-radius:12px;margin-top:12px;padding:14px}h1{font-size:20px;margin:0}h2{font-size:18px;margin:0 0 8px}label{display:grid;gap:4px;font-weight:650;margin-top:8px}input,button{font:inherit;min-height:38px;border-radius:8px;padding:8px 10px}@media(min-width:760px){#authCard{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;align-items:end}#authCard h2,#authCard details,#authCard .actions,#authCard .message{grid-column:1 / -1}}input{width:100%;border:1px solid #9db4c4}button{border:0;background:#173e56;color:white;cursor:pointer;font-weight:700}button:disabled{opacity:.5;cursor:default}.secondary{background:#e4edf4;color:#173349}.warn{background:#8e5000}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.notice,.message{padding:12px;background:#eef5fa;border-radius:8px;overflow-wrap:anywhere}.ok{background:#e3f4eb;color:#17613d}.bad{background:#fff0f0;color:#9b2735}.hidden{display:none!important}.small{font-size:14px;color:#526779}.confirm{display:flex;align-items:start;font-weight:500}.confirm input{width:22px;min-height:22px;flex-shrink:0}#conversionPreviewText{overflow-wrap:anywhere}a{color:#12527e}@media(max-width:500px){main{margin:12px auto;padding:0 10px}.card,.hero{padding:16px}.actions button{width:100%}}
 .card{padding:10px 12px;margin-top:8px}h1{font-size:18px}h2{font-size:16px}input,button{min-height:34px;padding:6px 8px}
-</style></head><body><main>
+</style><link rel="stylesheet" href="conversion-capacity.css"></head><body><main>
 <header class="hero"><h1>AQ／RT 締結率更新</h1><details><summary>怎麼更新</summary><p>選擇原報、核對截止與彙總，確認後更新 KPI 戰情與來客儀表板。</p></details></header>
 <section id="authCard" class="card"><h2>主管上傳驗證</h2><details><summary>驗證說明</summary><p class="small">請使用既有員編與管理者驗證碼。驗證碼僅供本次原服務核驗，不保存於瀏覽器。</p></details><label>員編<input id="employeeId" autocomplete="username"></label><label>管理者驗證碼<input id="adminSecret" type="password" autocomplete="current-password"></label><div class="actions"><button id="loginBtn" type="button">登入並讀取締結率版本</button></div><div id="authMessage" class="message hidden" role="status"></div></section>
 <section id="app" class="hidden"><section class="card" id="conversionUploadCard">
 <h2>AQ／RT 締結率及續約洞察來源</h2><p class="small">只發布已核實的九店彙總。原始 Excel 與客戶明細留在本機。</p>
 <label>締結率來源 Excel（.xlsx／.xlsm）<input id="conversionFile" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12"></label>
 <label>續約洞察補充 Excel<input id="renewalEvidenceFiles" type="file" accept=".xlsx,.xlsm" multiple></label>
-<p class="small">可同時補入含門市 Tier／未續約明細的 AQ／RT 原報或含「續約率(分母)」的日報。已有正式締結率時可單獨更新洞察。</p>
+<p class="small">可同時補入含門市 Tier／未續約明細的 AQ／RT 原報或含「續約率(分母)」的日報。已有正式締結率時可單獨更新洞察。若要對照量能與締結率，請在上方選擇同截止日締結率來源，再於下方分析。</p>
 <div class="actions"><button id="conversionPreviewBtn" type="button">檢查締結率來源</button><button id="conversionRefreshBtn" class="secondary" type="button">讀取締結率版本</button></div>
 <p id="conversionLive" class="notice">尚未核對版本。</p><div id="conversionMessage" class="message hidden" role="status"></div>
 <div id="conversionPreview" class="hidden"><p id="conversionPreviewText"></p><label class="confirm"><input id="conversionConfirm" type="checkbox">我已確認來源、截止及店日差異。</label><div class="actions"><button id="conversionPublishBtn" type="button" disabled>確認更新締結率</button></div></div>
 <div class="actions"><button id="conversionRollbackBtn" class="warn" type="button" disabled>回復上一個締結率版本</button></div>
-</section></section>
+</section><section id="capacity-panel" class="capacity-panel card"></section></section>
 <nav class="actions" aria-label="返回資料頁">
   <a href="kpi-battle.html?refresh=conversion#kpi">返回 KPI 戰情並重新讀取</a>
   <a href="readonly-dashboard.html">返回唯讀儀表板</a>
@@ -27,5 +27,5 @@
 <script src="readonly-renewal-detail.js?v=20261121-evidence"></script>
 <script src="store-renewal-evidence.js?v=20261121-evidence"></script>
 <script src="readonly-conversion-source.js?v=20261121-evidence"></script>
-<script src="readonly-conversion-upload.js?v=20261121-evidence"></script>
+<script src="conversion-capacity-core.js"></script><script src="conversion-capacity-ui.js"></script><script src="readonly-conversion-upload.js?v=20261125-capacity"></script>
 </body></html>
