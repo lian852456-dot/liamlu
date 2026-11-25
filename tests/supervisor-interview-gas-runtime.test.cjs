@@ -50,6 +50,7 @@ function harness(today='2026-09-05'){
     SpreadsheetApp:{openById:()=>{spreadsheetOpens+=1;return spreadsheet;}},
     LockService:{getScriptLock:()=>({waitLock:()=>{assert.equal(lockHeld,false);lockHeld=true;},releaseLock:()=>{assert.equal(lockHeld,true);lockHeld=false;}})},
     Utilities:{
+      Charset:{UTF_8:'UTF-8'},
       DigestAlgorithm:{SHA_256:'sha256'},
       computeDigest:(_algorithm,value)=>[...crypto.createHash('sha256').update(String(value)).digest()],
       formatDate:(_date,_zone,format)=>format==='yyyy-MM-dd'?today:`${today}T12:00:00+08:00`
@@ -133,4 +134,38 @@ test('前端合併重複列後可通過既有 GAS，重試只更新一筆且儀�
   const progress=model.quarterProgress(result.roster,result.records,result.quarter);
   assert.equal(progress.completed,2);
   assert.equal(progress.missing,1);
+});
+
+test('同店同日的中文姓名分開儲存，舊識別碼相同仍只更新指定列',()=>{
+  const env=harness();
+  const write=rows=>env.context.supervisorInterviewWritePayload_({token:'valid-token',rows});
+  const records=()=>env.context.supervisorInterviewReadPayload_({token:'valid-token'}).records;
+  const people=Array.from('甲乙丙丁戊己庚辛壬癸子丑寅卯辰',letter=>row({interviewee:'同仁'+letter,reporter:''}));
+  assert.equal(write([...people,people[0]]).written,15);
+  const sheet=env.sheets.get('督導面談紀錄');
+  const keyColumn=sheet.values[0].indexOf('recordKey');
+  const createdColumn=sheet.values[0].indexOf('createdAt');
+  assert.equal(new Set(sheet.values.slice(1).map(item=>item[keyColumn])).size,15);
+  sheet.values[1][keyColumn]=sheet.values[2][keyColumn];
+  sheet.values[1][createdColumn]='original creation';
+  const change={...people[0],guidance:'新指導'};
+  assert.equal(write([change]).updated,1);
+  assert.equal(write([change]).written,0);
+  assert.equal(records().length,15);
+  assert.equal(records()[0].guidance,'新指導');
+  assert.equal(records()[1].guidance,people[1].guidance);
+  assert.equal(sheet.values[1][createdColumn],'original creation');
+});
+
+test('同一面談有相異版本時先報預覽筆次，雲端有歧義也不覆寫',()=>{
+  const env=harness();
+  const write=rows=>env.context.supervisorInterviewWritePayload_({token:'valid-token',rows});
+  assert.throws(()=>write([row(),row({feedback:'修訂版'})]),/第 1 筆與第 2 筆.*內容不同/);
+  assert.equal(env.spreadsheetOpens,0);
+  write([row()]);
+  const sheet=env.sheets.get('督導面談紀錄');
+  sheet.values.push(sheet.values[1].slice());
+  const before=JSON.stringify(sheet.values);
+  assert.throws(()=>write([row({interviewee:'另一位'}),row({feedback:'修訂版'})]),/雲端已有多列.*第 2 筆/);
+  assert.equal(JSON.stringify(sheet.values),before);
 });
