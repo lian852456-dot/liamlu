@@ -1,3 +1,4 @@
+import {downloadReadonly,section,table} from './store-readonly-export.mjs';
 import {categories} from './op-series-core.mjs';
 if (window.parent !== window && new URLSearchParams(location.search).get('view') === 'battle') {
   document.querySelector('main > nav').hidden = true;
@@ -17,28 +18,7 @@ function tr(parent, values, tag = 'td') {
   for (const value of values) row.append(element(tag,value));
   return row;
 }
-function render() {
-  const code = $('store').value;
-  const current = report.stores.find(s => s.code === code) || report.area;
-  const scope = current.name || '北一二B';
-  $('period').textContent = '北一二B・' + report.date.slice(0,7) + '-01 至 ' + report.date + '・排除空機';
-  $('metrics').replaceChildren();
-  for (const [key,value] of [['累計上線',current.total + ' 件'],['月目標',current.target + ' 件'],['進度達成率',percent(current.rate)],['月目標達成率',percent(current.target ? current.total/current.target : null)]]) {
-    const tile = element('div');
-    tile.className = 'metric';
-    tile.append(element('small',key),element('strong',value)); $('metrics').append(tile);
-  }
-  $('stores').replaceChildren();
-  for (const s of report.stores) {
-    const row = tr($('stores'),['',s.total+'／'+s.target,percent(s.rate),...s.qty,s.idle+' 天']);
-    const button = element('button',s.name);
-    button.type = 'button'; button.onclick = () => { $('store').value = s.code; render(); };
-    row.cells[0].append(button);
-    if (s.rate !== null) row.cells[2].className = s.rate >= 1 ? 'on' : 'behind';
-    if (s.code === code) row.classList.add('chosen');
-  }
-  $('structureTitle').textContent = scope + '｜上線結構';
-  for (const button of $('tabs').children) button.setAttribute('aria-pressed',String(button.textContent === dimension));
+function breakdown(code,dimension) {
   const groups = new Map();
   const storeName = key => report.stores.find(s => s.code === key)?.name || '待核對';
   function ensure(key,label) {
@@ -64,13 +44,76 @@ function render() {
     }
     ensure(key,label).qty += sale.qty;
   }
-  const entries = [...groups.values()].sort((a,b) => b.qty-a.qty || a.label.localeCompare(b.label,'zh-Hant'));
+  return [...groups.values()].sort((a,b) => b.qty-a.qty || a.label.localeCompare(b.label,'zh-Hant'));
+}
+function storeCells(s) {
+  return [s.name,s.total+'／'+s.target,percent(s.rate),...s.qty,s.idle+' 天'];
+}
+function render() {
+  const code = $('store').value;
+  const current = report.stores.find(s => s.code === code) || report.area;
+  const scope = current.name || '北一二B';
+  $('exportReadonly').textContent = '一鍵匯出唯讀版（' + (code ? scope : '全區') + '）';
+  $('period').textContent = '北一二B・' + report.date.slice(0,7) + '-01 至 ' + report.date + '・排除空機';
+  $('metrics').replaceChildren();
+  for (const [key,value] of [['累計上線',current.total + ' 件'],['月目標',current.target + ' 件'],['進度達成率',percent(current.rate)],['月目標達成率',percent(current.target ? current.total/current.target : null)]]) {
+    const tile = element('div');
+    tile.className = 'metric';
+    tile.append(element('small',key),element('strong',value)); $('metrics').append(tile);
+  }
+  $('stores').replaceChildren();
+  for (const s of report.stores) {
+    const row = tr($('stores'),storeCells(s));
+    const button = element('button',s.name);
+    button.type = 'button'; button.onclick = () => { $('store').value = s.code; render(); };
+    row.cells[0].replaceChildren(button);
+    if (s.rate !== null) row.cells[2].className = s.rate >= 1 ? 'on' : 'behind';
+    if (s.code === code) row.classList.add('chosen');
+  }
+  $('structureTitle').textContent = scope + '｜上線結構';
+  for (const button of $('tabs').children) button.setAttribute('aria-pressed',String(button.textContent === dimension));
+  const entries = breakdown(code,dimension);
   $('basis').textContent = scope + '共 ' + current.total + ' 件' + (dimension === '資費' ? '，依報表認列資費統計。' : dimension === '同仁' ? '，按成交店點及推薦同仁歸戶，含名冊內零件數同仁。' : '。');
   $('breakHead').replaceChildren(); $('breakRows').replaceChildren();
   tr($('breakHead'),[dimension,'上線件數','占比'],'th');
   for (const g of entries) tr($('breakRows'),[g.label,g.qty,percent(current.total ? g.qty/current.total : null)]);
   if (!entries.length) tr($('breakRows'),['此範圍尚無上線',0,'—']);
 }
+function structureSection(code,label) {
+  const group=section(label+'｜上線結構',true);
+  const current=report.stores.find(s=>s.code===code) || report.area;
+  for(const dim of labels){
+    const part=section(dim,true);
+    const grid=table([dim,'上線件數','占比']);
+    const entries=breakdown(code,dim);
+    for(const entry of entries)tr(grid.body,[entry.label,entry.qty,percent(current.total?entry.qty/current.total:null)]);
+    if(!entries.length)tr(grid.body,['此範圍尚無上線',0,'—']);
+    if(dim==='同仁')part.append(element('p','依成交店點計件，姓名前的門市為推薦同仁所屬門市。'));
+    part.append(grid.wrapper);group.append(part);
+  }
+  return group;
+}
+$('exportReadonly').onclick=()=>{
+  if(!report)return;
+  const code=$('store').value;
+  const stores=report.stores.filter(s=>!code || s.code===code);
+  const scope=code?stores[0].name:'全區';
+  const summary=section(scope+'進度');
+  summary.append($('metrics').cloneNode(true));
+  const progress=section(code?'門市進度':'九店進度');
+  const headers=document.querySelectorAll('.overview thead th');
+  const grid=table(Array.from(headers,th=>th.textContent));
+  for(const s of stores){
+    const row=tr(grid.body,storeCells(s));
+    if(s.rate!=null)row.cells[2].className=s.rate>=1?'on':'behind';
+  }
+  progress.append(grid.wrapper);
+  const sections=[summary,progress];
+  if(!code)sections.push(structureSection('','全區'));
+  for(const s of stores)sections.push(structureSection(s.code,s.name));
+  if(code)sections.at(-1).open=true;
+  downloadReadonly('OP系列',scope,$('period').textContent,report.date,sections);
+};
 function show(value) {
   const selected = $('store').value;
   report = value;
@@ -79,6 +122,7 @@ function show(value) {
   $('store').value = report.stores.some(s => s.code === selected) ? selected : '';
   $('dashboard').hidden = false;
   render();
+  $('exportReadonly').hidden = false;
 }
 for (const label of labels) {
   const button = element('button',label); button.type='button';
@@ -131,5 +175,5 @@ window.addEventListener('storage', e => {
   if (e.key !== storageKey && e.key !== null) return;
   const latest = saved();
   if (latest) show(latest);
-  else { report = null; $('dashboard').hidden = true; $('period').textContent = '北一二B・排除空機'; }
+  else { report = null; $('exportReadonly').hidden = true; $('dashboard').hidden = true; $('period').textContent = '北一二B・排除空機'; }
 });
