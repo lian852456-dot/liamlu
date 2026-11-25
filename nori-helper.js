@@ -88,9 +88,43 @@
       } else showChoice(/幾|差|多少|進度|目標/.test(q) ? '你想看哪一項進度？' : '還沒找到對應的入口。可以輸入工具名稱，或選一個常查項目。', [['OP 系列','OP 進度'],['舊換新','舊換新進度'],['A999','A999 進度'],['動店','動店任務']]);
     }
   }
+  const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const feedback = byId('nori-feedback');
+  let poseTimer;
+  let nextRest = 'sit';
+
+  function setPose(pose, message = '') {
+    clearTimeout(poseTimer);
+    toggle.dataset.pose = pose;
+    feedback.textContent = message;
+  }
+  function resumeCat() {
+    if (!panel.hidden) {
+      setPose('sit');
+      return;
+    }
+    setPose('walk');
+    if (document.hidden || motion.matches) return;
+    poseTimer = setTimeout(() => {
+      setPose(nextRest);
+      nextRest = nextRest === 'sit' ? 'stretch' : 'sit';
+      poseTimer = setTimeout(resumeCat, 2600);
+    }, 7500);
+  }
+  function playWithCat(pose, message) {
+    setPose(pose, message);
+    poseTimer = setTimeout(resumeCat, 3200);
+  }
+  byId('nori-pet').addEventListener('click', () => playWithCat('purr', '海苔瞇起眼睛，呼嚕呼嚕。'));
+  byId('nori-toy').addEventListener('click', () => playWithCat('pounce', '海苔伸出爪子撲羽毛！'));
+  document.addEventListener('visibilitychange', resumeCat);
+  motion.addEventListener('change', resumeCat);
+  resumeCat();
+
   function openPanel(open, trigger) {
     if (open && trigger) opener = trigger;
     panel.hidden = !open;
+    resumeCat();
     toggle.setAttribute('aria-expanded', String(open));
     headerLink?.setAttribute('aria-expanded', String(open));
     if (open) input.focus({preventScroll:true});

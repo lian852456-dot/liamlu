@@ -63,3 +63,44 @@ body:has(#nori-helper:not([hidden])) .footer {padding-bottom:106px}
   .header-actions {flex-wrap:wrap}
   .header-actions .search-box {flex:1 1 118px; min-width:0}
 }
+
+.nori-play {
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  margin-top:12px; padding-top:10px; border-top:1px solid #e0eae3;
+}
+.nori-play button {
+  padding:6px 10px; border:1px solid #d1d9d4; border-radius:16px;
+  background:#fff; color:#365147; font-size:14px;
+}
+#nori-feedback {font-size:13px; line-height:1.5; color:#385444}
+#nori-toggle[data-pose]:not([data-pose="walk"]),
+#nori-toggle[data-pose]:not([data-pose="walk"]) .nori-cat {animation-play-state:paused}
+#nori-toggle[data-pose]:not([data-pose="walk"]) .nori-cat {
+  position:relative; background-image:none;
+}
+#nori-toggle[data-pose]:not([data-pose="walk"]) .nori-cat::before {
+  content:""; position:absolute; inset:0;
+  background:url("app-assets/nori-poses.webp") var(--pose-x,0%) center / 400% 100% no-repeat;
+  transform-origin:50% 95%;
+}
+#nori-toggle[data-pose="stretch"] {--pose-x:33.3333%}
+#nori-toggle[data-pose="purr"] {--pose-x:66.6667%}
+#nori-toggle[data-pose="pounce"] {--pose-x:100%}
+#nori-toggle[data-pose="purr"] .nori-cat::after,
+#nori-toggle[data-pose="pounce"] .nori-cat::after {
+  position:absolute; right:9%; top:0; line-height:1; font-size:18px;
+}
+#nori-toggle[data-pose="purr"] .nori-cat::after {content:"♥"; color:#b83957}
+#nori-toggle[data-pose="pounce"] .nori-cat::after {content:"🪶"; right:5%}
+@media(prefers-reduced-motion:no-preference) {
+  [data-pose="stretch"] .nori-cat::before {animation:nori-stretch 2.6s ease-in-out both}
+  [data-pose="purr"] .nori-cat::before {animation:nori-nuzzle 1s ease-in-out infinite alternate}
+  [data-pose="purr"] .nori-cat::after {animation:nori-heart 1.3s ease-out infinite}
+  [data-pose="pounce"] .nori-cat::before {animation:nori-reach .8s ease-in-out infinite alternate}
+  [data-pose="pounce"] .nori-cat::after {animation:nori-feather .8s ease-in-out infinite alternate}
+}
+@keyframes nori-stretch {50% {transform:scale(1.06,.92)}}
+@keyframes nori-nuzzle {from {transform:rotate(-4deg)} to {transform:rotate(4deg)}}
+@keyframes nori-heart {from {transform:translateY(3px);opacity:1} to {transform:translateY(-8px);opacity:0}}
+@keyframes nori-reach {to {transform:translate(3px,-5px) rotate(5deg)}}
+@keyframes nori-feather {to {transform:translate(5px,-6px) rotate(24deg)}}
