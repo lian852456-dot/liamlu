@@ -196,34 +196,89 @@
   }
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const feedback = byId('nori-feedback');
+  const caption = toggle.querySelector('.nori-caption');
+  const fiveButton = byId('nori-five');
+  const napButton = byId('nori-nap');
+  const rests = ['sit', 'groom', 'stretch', 'roll', 'sleep'];
+  let restIndex = 0;
   let poseTimer;
-  let nextRest = 'sit';
+  let awaiting = '';
 
   function setPose(pose, message = '') {
     clearTimeout(poseTimer);
     toggle.dataset.pose = pose;
     if (feedback) feedback.textContent = message;
   }
+  function setInteraction(play = '') {
+    awaiting = '';
+    toggle.dataset.play = play;
+    caption.textContent = '問海苔';
+    if (fiveButton) fiveButton.textContent = '擊掌';
+    if (napButton) napButton.textContent = '陪牠打盹';
+  }
   function resumeCat() {
-    if (!panel.hidden) {
-      setPose('sit');
-      return;
-    }
-    setPose('walk');
-    if (!feedback || document.hidden || motion.matches) return;
+    setInteraction();
+    setPose(panel.hidden ? 'walk' : 'sit');
+    if (!panel.hidden || document.hidden || motion.matches) return;
     poseTimer = setTimeout(() => {
-      setPose(nextRest);
-      nextRest = nextRest === 'sit' ? 'stretch' : 'sit';
-      poseTimer = setTimeout(resumeCat, 2600);
+      const pose = rests[restIndex];
+      restIndex = (restIndex + 1) % rests.length;
+      setPose(pose);
+      poseTimer = setTimeout(resumeCat, pose === 'sleep' ? 4800 : 2700);
     }, 7500);
   }
-  function playWithCat(pose, message) {
-    setPose(pose, message);
-    poseTimer = setTimeout(resumeCat, 3200);
+  // Each gesture owns one timer. A new gesture, panel change or backgrounded tab
+  // cancels all remaining stages before they can replace the current pose.
+  function perform(play, steps) {
+    setInteraction(play);
+    function next(index) {
+      const [pose, duration, message] = steps[index];
+      setPose(pose, message);
+      poseTimer = setTimeout(index + 1 < steps.length ? () => next(index + 1) : resumeCat, duration);
+    }
+    next(0);
+    for (const animation of toggle.getAnimations?.({subtree:true}) || []) {
+      if (['nori-yarn', 'nori-snack', 'nori-spark'].includes(animation.animationName)) animation.currentTime = 0;
+    }
   }
-  byId('nori-pet')?.addEventListener('click', () => playWithCat('purr', '海苔瞇起眼睛，呼嚕呼嚕。'));
-  byId('nori-toy')?.addEventListener('click', () => playWithCat('pounce', '海苔伸出爪子撲羽毛！'));
+  function highFive() {
+    if (awaiting === 'five') {
+      perform('high-five', [['highpaw', 850, '啪！海苔的肉球碰到你的手。'], ['purr', 1800, '擊掌成功，海苔瞇起了眼睛。']]);
+      return;
+    }
+    setInteraction('offer-paw');
+    awaiting = 'five';
+    setPose('highpaw', '海苔舉起了肉球。點牠的腳掌，或按「碰掌」。');
+    fiveButton.textContent = '碰掌';
+    caption.textContent = '碰掌';
+  }
+  function nap() {
+    if (awaiting === 'nap') {
+      perform('wake', [['stretch', 1500, '海苔醒了，慢慢伸了個懶腰。'], ['purr', 1200, '牠用臉頰蹭蹭你。']]);
+      return;
+    }
+    setInteraction('nap');
+    awaiting = 'nap';
+    setPose('sleep', '海苔把鼻尖藏進尾巴，蜷成一團睡著了。');
+    napButton.textContent = '叫醒海苔';
+    caption.textContent = '叫醒海苔';
+  }
+  byId('nori-pet')?.addEventListener('click', () => perform('pet', [['purr', 2600, '海苔瞇起眼睛，呼嚕呼嚕。']]));
+  byId('nori-toy')?.addEventListener('click', () => perform('feather', [['pounce', 2300, '海苔伸出爪子撲羽毛！'], ['bat', 900, '牠趴低身體，又撥了一下。']]));
+  byId('nori-ball')?.addEventListener('click', () => perform('ball', [
+    ['bat', 1400, '毛線球滾過來了，海苔伸爪攔住它。'],
+    ['pounce', 900, '海苔跳起來追球！'],
+    ['roll', 1900, '牠翻了個身，把球抱在肚子上。']
+  ]));
+  byId('nori-treat')?.addEventListener('click', () => perform('treat', [
+    ['nibble', 2000, '海苔湊過來，低頭吃掉小零食。'],
+    ['groom', 2300, '吃完了，海苔舔舔爪子洗臉。']
+  ]));
+  fiveButton?.addEventListener('click', highFive);
+  napButton?.addEventListener('click', nap);
   document.addEventListener('visibilitychange', resumeCat);
+  window.addEventListener('pagehide', () => { clearTimeout(poseTimer); });
+  window.addEventListener('pageshow', resumeCat);
   motion.addEventListener('change', resumeCat);
   resumeCat();
 
@@ -243,7 +298,11 @@
     else opener.focus({preventScroll:true});
   }
   for (const [label, question] of shortcuts) byId('nori-shortcuts').append(button(label, question));
-  toggle.addEventListener('click', () => openPanel(panel.hidden, toggle));
+  toggle.addEventListener('click', () => {
+    if (!panel.hidden && awaiting === 'five') highFive();
+    else if (!panel.hidden && awaiting === 'nap') nap();
+    else openPanel(panel.hidden, toggle);
+  });
   if (headerLink) {
     headerLink.href = '#ask-nori';
     headerLink.setAttribute('aria-controls', panel.id);
