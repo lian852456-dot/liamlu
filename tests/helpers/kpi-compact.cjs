@@ -280,3 +280,43 @@ test('focus tasks use the verified session, distinguish missing staff and filter
  expect(await page.evaluate(()=>sessionStorage.getItem('north12b.focus-tasks.v1'))).toBeNull();
  expect(f.errors).toEqual([]);
 });
+
+test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清除',async({page},info)=>{
+ await page.route('**/assets/vendor/xlsx.full.min.js',route=>route.fulfill({
+  contentType:'text/javascript',body:fs.readFileSync(path.join(root,'assets/vendor/xlsx.full.min.js'))
+ }));
+ const {calls}=await start(page,{ttl:1800000,battleView:true});
+ const entry=page.getByRole('button',{name:'締結率',exact:true});
+ await expect(page.locator('[data-b-module="kpi"] + button')).toHaveText('締結率');
+ const requestCount=calls.length;
+ await entry.click();
+ const report=page.frameLocator('#panel-conversion iframe');
+ await expect(page).toHaveURL(/#conversion$/);
+ await expect(report.locator('#back')).toBeHidden();
+ const XLSX=require('../../assets/vendor/xlsx.full.min.js'),book=XLSX.utils.book_new();
+ const rows=[['資料起日','截止日','區別','店碼','店名','AQ上線數','AQ來客數','RT續約數','RT合格來客數'],
+  ['2026-11-01','2026-11-03','北一二B','DNB10001','示範店',54,120,4,10],
+  ['2026-11-01','2026-11-03','北一二A','DNB10002','跨區驗收店',5,5,5,5]];
+ XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(rows),'部區月累計');
+ const file=info.outputPath('sample.xlsx');
+ fs.mkdirSync(path.dirname(file),{recursive:true});
+ fs.writeFileSync(file,Buffer.from(XLSX.write(book,{type:'array',bookType:'xlsx'})));
+ await report.locator('#files').setInputFiles(file);
+ await expect(report.locator('#status')).toContainText('sample.xlsx');
+ await expect(report.locator('#full')).toBeVisible();
+ await expect(report.locator('#region option')).toHaveText(['北一二B']);
+ await expect(report.locator('#store option')).toHaveText(['全部門市','北一二B／示範店']);
+ const download=page.waitForEvent('download');
+ await report.getByRole('button',{name:'匯出所選範圍 HTML'}).click();
+ const html=fs.readFileSync(await (await download).path(),'utf8');
+ const snapshot=JSON.parse(html.match(/id="report-snapshot">([\s\S]*?)<\/script>/)[1]);
+ expect(snapshot.models.map(m=>m.scope)).toEqual(['北一二B','DNB10001']);
+ expect(JSON.stringify(snapshot)).not.toContain('跨區驗收店');
+ await page.locator('[data-b-module="kpi"]').click();
+ await entry.click();
+ await expect(report.locator('#overview')).toContainText('45.00%');
+ expect(calls.length).toBe(requestCount);
+ await page.locator('.b-more summary').click();
+ await page.locator('[data-b-logout]').click();
+ await expect(page.locator('#panel-conversion iframe')).toHaveCount(0);
+});

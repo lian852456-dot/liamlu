@@ -14,9 +14,20 @@ function validate(value){
  if(!/^[a-f0-9]{64}$/.test(value.sha256||''))fail('來源缺少 SHA-256');
  if(!Array.isArray(value.stores)||!value.stores.length||value.stores.length>100)fail('缺少門市名冊');const stores=value.stores.map(s=>{if(!REGIONS.includes(s.region)||!/^DNB\d{5}$/.test(s.id)||!String(s.name||'').trim())fail('店碼／區別／店名不符');return {id:s.id,name:String(s.name),short:String(s.short||s.name),region:s.region};}),ids=new Set(stores.map(s=>s.id));if(ids.size!==stores.length)fail('店碼重複');
  if(!Array.isArray(value.records)||value.records.length>stores.length*31)fail('店日資料不完整');const records=dedupe(value.records.map(row=>{if(!ids.has(row.store))fail('未知門市');const date=iso(row.date);if(date<start||date>cutoff)fail('店日超出期間');const clean={store:row.store,date};for(const k of FIELDS)clean[k]=count(row[k],k);if(clean.aq_d===0&&clean.aq_n||clean.rt_d===0&&clean.rt_n)fail('零分母但有上線實績');return clean;}));
- if(records.length!==stores.length*days)fail('缺少店日，不補零');for(const id of ids)for(let d=1;d<=days;d++)if(!records.some(r=>r.store===id&&r.date===start.slice(0,8)+String(d).padStart(2,'0')))fail('缺少店日，不補零');
- let prior=null,prior_period=null;if(value.prior!=null){if(!Array.isArray(value.prior)||value.prior.length!==stores.length||new Set(value.prior.map(r=>r.store)).size!==stores.length)fail('同期門市不完整');prior=value.prior.map(row=>{if(!ids.has(row.store))fail('同期門市不符');const out={store:row.store};for(const k of FIELDS)out[k]=count(row[k],k);if(out.aq_d===0&&out.aq_n||out.rt_d===0&&out.rt_n)fail('同期零分母衝突');return out;});const p=value.prior_period;if(!p||iso(p.start)>iso(p.end)||p.start.slice(-2)!=='01'||Number(p.end.slice(-2))!==days||p.start.slice(0,7)!==p.end.slice(0,7))fail('同期期間不符');const previous=new Date(start+'T00:00:00Z');previous.setUTCMonth(previous.getUTCMonth()-1);if(p.start.slice(0,7)!==previous.toISOString().slice(0,7))fail('同期不是上月');prior_period={start:p.start,end:p.end};}
- return {schema:SCHEMA,period_start:start,cutoff,sha256:value.sha256,source_name:String(value.source_name||'已核對締結率來源'),source_bytes:count(value.source_bytes||0,'來源大小'),stores,records,prior,prior_period,...(value.renewalDetail?{renewalDetail:Detail.validate(value.renewalDetail,stores,start,cutoff)}:{})};
+ let monthlyTotals=null;
+ if(value.monthlyTotals!=null){
+  if(records.length||!Array.isArray(value.monthlyTotals)||value.monthlyTotals.length!==stores.length)fail('月累計與逐日資料不能混用');
+  const seen=new Set();
+  monthlyTotals=value.monthlyTotals.map(r=>{
+   if(!ids.has(r.store)||seen.has(r.store))fail('月累計店碼重複或未知');
+   seen.add(r.store);const out={store:r.store};for(const key of FIELDS)out[key]=count(r[key],key);
+   if(!out.aq_d&&out.aq_n||!out.rt_d&&out.rt_n)fail('月累計零分母衝突');
+   return out;
+  });
+ }
+ if(!monthlyTotals&&records.length!==stores.length*days)fail('缺少店日，不補零');if(!monthlyTotals)for(const id of ids)for(let d=1;d<=days;d++)if(!records.some(r=>r.store===id&&r.date===start.slice(0,8)+String(d).padStart(2,'0')))fail('缺少店日，不補零');
+ let prior=null,prior_period=null;if(value.prior!=null){if(!Array.isArray(value.prior)||value.prior.length!==stores.length||new Set(value.prior.map(r=>r.store)).size!==stores.length)fail('同期門市不完整');prior=value.prior.map(row=>{if(!ids.has(row.store))fail('同期門市不符');const out={store:row.store};for(const k of FIELDS)out[k]=count(row[k],k);if(out.aq_d===0&&out.aq_n||out.rt_d===0&&out.rt_n)fail('同期零分母衝突');return out;});const p=value.prior_period;if(!p||iso(p.start)>iso(p.end)||p.start.slice(-2)!=='01'||Number(p.end.slice(-2))!==Math.min(days,new Date(Date.UTC(+start.slice(0,4),+start.slice(5,7)-1,0)).getUTCDate())||p.start.slice(0,7)!==p.end.slice(0,7))fail('同期期間不符');const previous=new Date(start+'T00:00:00Z');previous.setUTCMonth(previous.getUTCMonth()-1);if(p.start.slice(0,7)!==previous.toISOString().slice(0,7))fail('同期不是上月');prior_period={start:p.start,end:p.end};}
+ return {schema:SCHEMA,period_start:start,cutoff,sha256:value.sha256,source_name:String(value.source_name||'已核對締結率來源'),source_bytes:count(value.source_bytes||0,'來源大小'),stores,records,...(monthlyTotals?{monthlyTotals}:{}),prior,prior_period,...(value.renewalDetail?{renewalDetail:Detail.validate(value.renewalDetail,stores,start,cutoff)}:{})};
 }
 function workbookRows(workbook,XLSX,name){if(!workbook.Sheets[name])fail('缺少必要工作表：'+name);return XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,raw:true,defval:null,blankrows:true});}
 function equal(value,expected,label){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value-expected)>Math.max(1e-8,Math.abs(expected)*1e-8))fail(label+' 與逐日加總不一致');}
@@ -32,6 +43,13 @@ function normalizeWorkbook(workbook,XLSX){
   if(!signatures[name])continue;
   const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null,blankrows:true,range:0});
   const headers=rows.flatMap((row,r)=>signatures[name].every(label=>row.some(v=>sourceName(v)===label))&&row.some(v=>/\d+\/\d+~\d+\/\d+/.test(sourceName(v)))?[r]:[]);
+  // The official workbook repeats the same period above its organisation totals.
+  if(headers.length===2){
+   const [first,second]=headers,heading=rows[first].find(v=>/\d+\/\d+~\d+\/\d+/.test(sourceName(v)));
+   if(sourceName(rows[second][1])==='部' && sourceName(rows[second][2])===sourceName(heading)
+      && rows.slice(first+1,second).some(r=>/^DNB\d{5}$/.test(r[3]))
+      && !rows.slice(second+1).some(r=>/^DNB\d{5}$/.test(r[3]))) headers.pop();
+  }
   if(headers.length>1)fail(name+' 有重複的表頭區塊，請保留單一期間');
   if(!headers.length)continue; // Existing schema checks supply the missing-field diagnostic.
   const top=headers[0],left=rows[top].findIndex(v=>/\d+\/\d+\s*~\s*\d+\/\d+/.test(sourceName(v)));
@@ -51,7 +69,25 @@ function normalizeWorkbook(workbook,XLSX){
  }
  return {...workbook,Sheets};
 }
+// Explicit period totals have no observation date and never enter the daily records array.
+function parseMonthly(workbook,XLSX,options){
+ const rows=workbookRows(workbook,XLSX,'部區月累計'),header=rows.shift().map(sourceName);
+ const labels=['資料起日','截止日','區別','店碼','店名','AQ上線數','AQ來客數','RT續約數','RT合格來客數'];
+ const columns=labels.map(label=>{const i=header.indexOf(label);if(i<0||header.lastIndexOf(label)!==i)fail('部區月累計缺少或重複 '+label);return i;});
+ const stores=[],monthlyTotals=[];let period_start,cutoff;
+ for(const row of rows.filter(r=>r.some(v=>v!=null&&v!==''))){
+  const [start,end,region,id,name,...values]=columns.map(i=>row[i]);
+  const date=v=>typeof v==='number'?dateSerial(v):iso(v);
+  if(!REGIONS.includes(region))continue;
+  if(period_start&&(period_start!==date(start)||cutoff!==date(end)))fail('月累計列的期間不一致');
+  period_start=date(start);cutoff=date(end);stores.push({region,id,name,short:name});
+  monthlyTotals.push({store:id,...Object.fromEntries(FIELDS.map((k,i)=>[k,count(values[i],labels[5+i])]))});
+ }
+ const data=validate({...options,schema:SCHEMA,period_start,cutoff,stores,records:[],monthlyTotals});
+ return validate({...data,renewalDetail:Detail.parseAvailable(workbook,XLSX,data)});
+}
 function parseWorkbook(workbook,XLSX,options={}){
+ if(workbook.Sheets['部區月累計']&&!Object.keys(workbook.Sheets).some(n=>['AQ締結率','RT每日','RT締結率'].includes(sourceName(n))))return parseMonthly(workbook,XLSX,options);
  workbook=normalizeWorkbook(workbook,XLSX);
  const rows=workbookRows(workbook,XLSX,'AQ締結率'),catalog=new Map();for(const row of rows){if(!REGIONS.includes(row[2])||!/^DNB\d{5}$/.test(row[3]))continue;const store={id:row[3],name:String(row[4]||'').trim(),short:String(row[4]||'').replace('台灣大哥大數位生活台北三創','三創'),region:row[2]};if(!store.name)fail('缺少店名');if(catalog.has(store.id)&&JSON.stringify(catalog.get(store.id))!==JSON.stringify(store))fail('店碼對應衝突');catalog.set(store.id,store);}
  if(!catalog.size)fail('沒有北一二部四區的門市來源');const stores=[...catalog.values()];
@@ -109,12 +145,22 @@ function merge(current,incoming){const next=validate(incoming);if(!current)retur
       Base.verifyRtTotalRate(t[T.rate],total,`${s.short} RT締結率!${XLSX.utils.encode_cell({r:totals.indexOf(t),c:T.rate})}`);
       if(includePrior)prior.push({store:s.id,aq_n:count(a[A.priorN],'同期AQ上線'),aq_d:count(a[A.priorD],'同期AQ來客'),rt_n:count(t[T.priorN],'同期RT上線'),rt_d:count(t[T.priorD],'同期RT來客')});
     }
-    const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorEnd=previous+'-'+String(valid).padStart(2,'0');
+    const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),priorStart=previous+'-01',priorDays=Math.min(valid,new Date(Date.UTC(year,month-1,0)).getUTCDate()),priorEnd=previous+'-'+String(priorDays).padStart(2,'0');
     if(includePrior){
-    const pivot=workbookRows(workbook,XLSX,'樞紐'),label=Number(previous.slice(5,7))+'/1';if(!pivot.flat().some(v=>typeof v==='string'&&v.includes(label)&&new RegExp('~\\s*'+Number(previous.slice(5,7))+'/'+valid+'(?:\\D|$)').test(v)))fail('同期區間文字尚未核實');
+    const pivot=workbookRows(workbook,XLSX,'樞紐'),label=Number(previous.slice(5,7))+'/1';if(!pivot.flat().some(v=>typeof v==='string'&&v.includes(label)&&new RegExp('~\\s*'+Number(previous.slice(5,7))+'/'+priorDays+'(?:\\D|$)').test(v)))fail('同期區間文字尚未核實');
     }
     return validate({schema:SCHEMA,stores,period_start:begin,cutoff,sha256,source_name,source_bytes,records,prior:includePrior?prior:null,prior_period:includePrior?{start:priorStart,end:priorEnd}:null});
   }
-function buildHtml(value,assets){const data=validate(value),json=JSON.stringify(data).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');let html=assets.html.replace(/<section id="import-panel">[\s\S]*?<\/section>/,'').replace(/<script src="[^\"]+"><\/script>/g,'').replace(/<link rel="stylesheet"[^>]+>/,'<style>'+assets.css.replace(/<\/style/gi,'<\\/style')+'</style>').replace(/<meta http-equiv="Content-Security-Policy"[^>]+>/,"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'\">");return Html.finalize(html.replace('</body>','<script type="application/json" id="officer-data">'+json+'</script><script>'+assets.core.replace(/<script/gi,'\\x3cscript').replace(/<\/script/gi,'<\\/script').replace(/<\/body/gi,'<\\/body')+'</script><script>'+assets.ui.replace(/<script/gi,'\\x3cscript').replace(/<\/script/gi,'<\\/script').replace(/<\/body/gi,'<\\/body')+'</script></body>'));}
-return {REGIONS,SCHEMA,safe,parseWorkbook,validate,merge,buildHtml,aggregate:Base.aggregate,dailySeries:Base.dailySeries,weeklySeries:Base.weeklySeries};
+function inlineHtml(value,assets,id){
+  const json=JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
+  const script=code=>'<script>'+code.replace(/<\/script/gi,'<\\/script').replace(/<(script|!--|\/body|\/head)/gi,(_,suffix)=>'\\x3c'+suffix)+'</script>';
+  const html=assets.html.replace(/<section id="import-panel">[\s\S]*?<\/section>/,'')
+    .replace(/<script src="[^"]+"><\/script>/g,'')
+    .replace(/<link rel="stylesheet"[^>]+>/,()=>'<style>'+assets.css+'</style>')
+    .replace('</body>',()=>'<script type="application/json" id="'+id+'">'+json+'</script>'+script(assets.core)+script(assets.ui)+'</body>');
+  return Html.finalize(html);
+}
+function buildHtml(value,assets){return inlineHtml(validate(value),assets,'officer-data');}
+function snapshotHtml(value,assets){return inlineHtml(value,assets,'report-snapshot');}
+return {REGIONS,SCHEMA,safe,normalizeWorkbook,parseWorkbook,validate,merge,buildHtml,snapshotHtml,aggregate:Base.aggregate,dailySeries:Base.dailySeries,weeklySeries:Base.weeklySeries};
 });

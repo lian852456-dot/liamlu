@@ -1,2 +1,38 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>北一二部｜締結率／來客數／續約洞察唯讀看板</title><link rel="stylesheet" href="north12-officer.css?v=20261124-compact-1"></head><body><main><header><img class="brand" src="assets/brand/twm-logo.png" alt="台灣大哥大"><p class="eyebrow">NORTH 12 · DEPARTMENT OVERVIEW</p><h1>北一二部｜締結率／來客數／續約洞察</h1><p>AQ／RT 締結率・來客數・同期 MoM・Tier 掌握・未續約方案</p></header><section id="import-panel"><h2>準備長官查看版本</h2><details><summary>需要哪些原報</summary><p>選取包含「AQ締結率、RT每日、RT締結率」的原報。「樞紐」用於核對上月同期，未提供時顯示當期資料。另讀取「Tier觀察、RT用戶進店行為_店、未續約明細」，在本機產生區／店彙總；匯出的 HTML 可直接開啟與篩選。</p></details><div class="toolbar"><label class="button">選取 AQ／RT 原報<input id="files" type="file" accept=".xlsx,.xlsm" multiple></label><button id="export" disabled>一鍵匯出三項唯讀HTML</button><button id="clear">清除本次資料</button><a href="department-ops.html#conversion">返回部區管理</a></div></section><p id="status" role="status">尚未選取來源資料。</p><section class="layout-skeleton" aria-label="載入後的版面預覽"><p class="skeleton-kicker">選取原報後會看到九店締結率、來客與續約洞察</p><div class="skeleton-board"><div class="skeleton-main"><table><thead><tr><th>店點</th><th>AQ締結率</th><th>RT締結率</th><th>來客數</th><th>Tier</th></tr></thead><tbody><tr><td>酒泉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>永吉</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>復興南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>杭州南</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>萬大</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>通化</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>大稻埕</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>三創</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr><tr><td>六張犁</td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td><td><i class="bar"></i></td></tr></tbody></table></div><aside class="skeleton-side" aria-hidden="true"><span></span><span></span><span></span><span></span></aside></div></section><div id="view" hidden><section id="coverage" class="notice"></section><section id="regions" class="region-grid"></section><section class="panel"><div class="filters"><label>部區<select id="region"></select></label><label>門市<select id="store"></select></label><label>起日<input id="start" type="date"></label><label>迄日<input id="end" type="date"></label></div><div class="toolbar tabs"><button data-tab="conversion">締結率</button><button data-tab="traffic">來客數</button><button data-tab="insights">續約洞察</button></div></section><div id="content"></div><aside class="notice">AQ 來客與符合 RT 續約資格的來客分列，不相加為門市總來客。締結率以分子／分母合計重算；零分母顯示 —。Tier／方案依本次原報頁籤統計；不含客戶識別。</aside></div><footer id="source">資料尚未載入。版本 20261113-import-review1</footer></main><script src="assets/vendor/xlsx.full.min.js"></script><script src="readonly-dashboard-core.js?v=20261113-import-review1"></script><script src="readonly-renewal-detail.js?v=20261113-import-review1"></script><script src="offline-html.js?v=20261105-1"></script>
-<script src="north12-officer-core.js?v=20261113-import-review1"></script><script src="north12-officer-export-assets.js?v=20261124-compact-1"></script><script src="north12-officer.js?v=20261113-import-review1"></script></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>北一二部｜締結率、來客趨勢與 Tier 洞察</title>
+<link rel="stylesheet" href="north12-officer.css?v=20261125-1">
+</head>
+<body><main>
+<header><img class="brand" src="assets/brand/twm-logo.png" alt="台灣大哥大"><div><small>北一二部　／　部區管理</small><h1>締結率、來客趨勢與 Tier 洞察</h1></div></header>
+<section id="import-panel"><label class="primary file">選取本機原報<input id="files" type="file" accept=".xlsx,.xlsm" multiple></label>
+<button id="export" disabled>一鍵匯出三項唯讀HTML</button><button id="clear">清除本次資料</button>
+<a id="back" href="department-ops.html#conversion">返回部區管理</a>
+<details><summary>原報與期間</summary><p>可一次選取當月及上月原報。使用 AQ締結率、RT每日、RT締結率核對店日，樞紐核對上月同期。Tier 採 RT用戶進店行為_店、Tier觀察；未續約明細只保留方案彙總。若只有店月總計，可選取「部區月累計」工作表，欄名依序為資料起日、截止日、區別、店碼、店名、AQ上線數、AQ來客數、RT續約數、RT合格來客數。資料限本次開啟期間，可下載離線版留存。</p></details></section>
+<p id="status" role="status">請選取本機 AQ／RT 原報以查看部與四區摘要。</p>
+<div id="view" hidden>
+<section class="filters" aria-label="分析篩選">
+<label>資料月份<select id="month"></select></label><label>統計截至<input type="date" id="end"></label>
+<label>部區<select id="region"></select></label><label>門市<select id="store"></select></label>
+<label>口徑<select id="channel"><option value="rt">RT 合格來客</option><option value="aq">AQ 來客</option></select></label>
+<label>比較基準<select id="base"><option value="office">正式處級基準</option><option value="department">北一二部</option></select></label>
+<label>月比較<select id="monthMode"><option value="same">MoM 同期</option><option value="whole">整月 MoM</option></select></label>
+</section>
+<section aria-labelledby="overviewTitle"><h2 id="overviewTitle">部／區／店總覽</h2><div id="overview"></div><div id="summary"></div></section>
+<div id="full"><nav aria-label="報表內容"><a href="#trend">來客與締結率</a><a href="#tier" data-tab="insights">Tier 客群</a><a href="#actions">改善追蹤</a></nav>
+<div id="content"><section id="trend"><h2>每週與基準的差距</h2><div class="chartbar"><label>趨勢指標 <select id="metric"><option value="level">每店日均來客差異</option><option value="growth">來客成長差</option><option value="rate">締結率差</option></select></label><span id="legend"></span></div><div id="chart"></div></section>
+<section><h2>門市比較</h2><label>比較期間 <select id="period"><option value="wow">每週 WoW</option><option value="mom">月份 MoM</option></select></label><div id="comparison"></div></section>
+<section id="tier"><h2>RT Tier 客群表現</h2><div class="chartbar"><label>Tier 來源 <select id="tierSource"><option value="store">店級 A～F</option><option value="TWM">區級原 TWM A～E</option><option value="TST">區級原 TST A～E</option></select></label><label>熱區指標 <select id="heatMetric"><option value="rate">締結率</option><option value="visitors">合格來客</option><option value="renewals">續約</option><option value="gap">同 Tier 差距</option></select></label><label>觀察門檻 <input id="threshold" type="number" min="1" max="100000" value="30"> 人次</label></div><div id="tierBody"></div></section>
+<section id="actions"><h2>問題、改善建議與追蹤重點</h2><div id="advice"></div></section>
+</div></div><details id="source"><summary>來源、批次與涵蓋範圍</summary><div id="sourceBody"></div></details>
+</div></main>
+<script src="assets/vendor/xlsx.full.min.js"></script>
+<script src="readonly-dashboard-core.js"></script><script src="readonly-renewal-detail.js"></script>
+<script src="offline-html.js"></script><script src="north12-officer-core.js?v=20261125-1"></script>
+<script src="north12-office-source.js"></script><script src="north12-trends.js"></script><script src="north12-trend-report.js"></script>
+<script src="north12-trend-view.js"></script><script src="north12-officer-export-assets.js?v=20261125-2"></script><script src="north12-officer.js?v=20261125-2"></script>
+</body></html>

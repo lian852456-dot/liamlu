@@ -75,9 +75,9 @@ for(const width of [1440,390])test(`saved data, three tabs and compact dashboard
  await expect(page.locator('#storePanel')).toBeHidden();
  await expect(page.locator('#goldPanel')).toBeHidden();
  await page.getByRole('link',{name:'開啟部區報表'}).click();
- await expect(page).toHaveURL(/north12-officer\.html$/);
- await expect(page.locator('#import-panel')).toBeVisible();
- await page.getByRole('link',{name:'返回部區管理'}).click();
+ await expect(page).toHaveURL(/#conversion-report$/);
+ await expect(page.frameLocator('#conversionReport iframe').locator('#import-panel')).toBeVisible();
+ await page.getByRole('link',{name:'返回部區摘要'}).click();
  await expect(page.getByRole('tab',{name:'部區締結率',selected:true})).toBeVisible();
  expect(s.errors).toEqual([]);expect(s.calls.filter(p=>/publish|restore/.test(p.action))).toEqual([]);fs.writeFileSync(path.join(dir,`metrics-${width}.json`),JSON.stringify({viewport:width,sizes,visibleRows,readCalls:s.urls.length,noWrites:true,noFile:true,errors:s.errors},null,2));
 });
