@@ -135,7 +135,9 @@ test('督導入口包含手機本機雙檔工具，日誌檢查不再位於同�
   const supervisor = home.slice(home.indexOf('aria-label="督導專區"'), home.indexOf('</nav>', home.indexOf('aria-label="督導專區"')));
   const staff = home.slice(home.indexOf('aria-label="同仁大廳"'), home.indexOf('</nav>', home.indexOf('aria-label="同仁大廳"')));
   assert.match(supervisor, /href="phone-stock-dashboard\.html"[\s\S]*手機近三日銷售與庫存/);
-  assert.match(supervisor, /href="daily-log-dashboard\.html"[\s\S]*每日日誌檢查/);
+  const quick = home.match(/<nav class="quick-grid" aria-label="常用入口">([\s\S]*?)<\/nav>/)[1];
+  assert.doesNotMatch(supervisor, /daily-log-dashboard\.html/);
+  assert.match(quick, /href="daily-log-dashboard\.html"[\s\S]*每日日誌檢查/);
   assert.doesNotMatch(staff, /daily-log-dashboard\.html/);
 });
 
