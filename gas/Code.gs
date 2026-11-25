@@ -2082,9 +2082,13 @@ function supervisorInterviewOptionalDate_(value, label) {
   return result;
 }
 
+function supervisorInterviewIdentity_(row) {
+  return JSON.stringify([row.interviewDate, row.organization, row.interviewee, row.reason]);
+}
+
 function supervisorInterviewRecordKey_(row) {
   const material = [row.interviewDate, row.organization, row.interviewee, row.reason].join('|');
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, material);
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, material, Utilities.Charset.UTF_8);
   return bytes.map(function(byte) {
     const normalized = byte < 0 ? byte + 256 : byte;
     return ('0' + normalized.toString(16)).slice(-2);
@@ -2165,33 +2169,47 @@ function supervisorInterviewWritePayload_(payload) {
   const currentQuarter = supervisorInterviewCurrentQuarter_();
   const rawRows = Array.isArray(body.rows) ? body.rows : [];
   if (!rawRows.length || rawRows.length > 200) throw new Error('面談匯入筆數不正確');
-  const rows = rawRows.map(function(row) { return supervisorInterviewValidateRow_(row, currentQuarter); });
-  const keys = {};
-  rows.forEach(function(row) {
-    if (keys[row.recordKey]) throw new Error('面談檔案內有重複紀錄');
-    keys[row.recordKey] = true;
+  const incoming = new Map();
+  rawRows.forEach(function(raw, index) {
+    const row = supervisorInterviewValidateRow_(raw, currentQuarter);
+    const identity = supervisorInterviewIdentity_(row);
+    const previous = incoming.get(identity);
+    if (!previous) {
+      incoming.set(identity, { row:row, position:index + 1 });
+    } else if (SUPERVISOR_INTERVIEW_CLIENT_FIELDS.some(function(field) { return previous.row[field] !== row[field]; })) {
+      throw new Error('匯入預覽第 ' + previous.position + ' 筆與第 ' + (index + 1) + ' 筆為同一筆面談，但內容不同');
+    }
   });
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     const sheet = supervisorInterviewSheet_();
     const existing = supervisorInterviewRows_();
+    // 依實際欄位對帳，使舊版識別碼的資料也能原列更新。
+    const current = existing.filter(function(item) { return item.quarter === currentQuarter; });
+    const rowByIdentity = new Map();
+    current.forEach(function(item, index) {
+      const identity = supervisorInterviewIdentity_(item);
+      if (incoming.has(identity) && rowByIdentity.has(identity)) {
+        throw new Error('雲端已有多列對應預覽第 ' + incoming.get(identity).position + ' 筆面談，請先核對既有紀錄');
+      }
+      rowByIdentity.set(identity, index + 2);
+    });
     // 新季度首次成功寫入時，刪除上一季資料。讀取不刪資料，避免時鐘或空檔造成誤刪。
     for (let index = existing.length - 1; index >= 0; index -= 1) {
       if (existing[index].quarter !== currentQuarter) sheet.deleteRow(index + 2);
     }
-    const current = supervisorInterviewRows_();
-    const rowByKey = {};
-    current.forEach(function(item, index) { rowByKey[item.recordKey] = index + 2; });
     let written = 0;
     let updated = 0;
     const now = supervisorInterviewNow_();
-    rows.forEach(function(row) {
-      const old = rowByKey[row.recordKey] ? current[rowByKey[row.recordKey] - 2] : null;
+    incoming.forEach(function(entry, identity) {
+      const row = entry.row;
+      const sheetRow = rowByIdentity.get(identity);
+      const old = sheetRow ? current[sheetRow - 2] : null;
       const stored = Object.assign({}, row, { createdAt:old && old.createdAt ? old.createdAt : now, updatedAt:now });
       const values = SUPERVISOR_INTERVIEW_HEADERS.map(function(header) { return stored[header] || ''; });
-      if (rowByKey[row.recordKey]) {
-        sheet.getRange(rowByKey[row.recordKey], 1, 1, SUPERVISOR_INTERVIEW_HEADERS.length).setValues([values]);
+      if (sheetRow) {
+        sheet.getRange(sheetRow, 1, 1, SUPERVISOR_INTERVIEW_HEADERS.length).setValues([values]);
         updated += 1;
       } else {
         sheet.getRange(sheet.getLastRow() + 1, 1, 1, SUPERVISOR_INTERVIEW_HEADERS.length).setValues([values]);
