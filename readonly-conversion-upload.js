@@ -32,7 +32,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
   const capacity=window.createCapacityPanel($('capacity-panel'),async()=>{
     const file=$('conversionFile').files[0];
     return file?(await readConversion(file)).snapshot:null;
-  });
+  },undefined,{crossDistrict:true});
   const ids = ['conversionFile','renewalEvidenceFiles','conversionPreviewBtn','conversionRefreshBtn','conversionPublishBtn','conversionRollbackBtn'];
   function controls() {
     ids.forEach(id => { $(id).disabled = busy; });

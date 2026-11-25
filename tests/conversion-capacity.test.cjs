@@ -29,3 +29,31 @@ test('同期才整合，締結率使用分子分母，分母零保留缺值',()=
  assert.equal(reminder(r,row,{...snapshot,cutoff:'2027-02-27'}).rate,null);
  snapshot.records[0].aq_d=0;assert.equal(reminder(r,row,snapshot).rate,null);
 });
+
+const mix=require('../conversion-capacity-mix.js');
+function details(){
+  const date=Date.UTC(2027,1,28)/86400000+25569;
+  const summary=[[],[],[null,null,null,'實際數(含通轉手)'],['北一二A','北一二A',null,1],
+    ['北一二B','北一二B',null,6],['北一二B',STORES[0].id,null,6]];
+  const columns=['統計日期','業務分區','營業店點代碼','用戶人數','表定V_D_V','用戶群組','搭配之Phone_Mode','專案分類'];
+  const entries=[columns,[date,'北一二A','test',1,1599,'甲','平板','手機案'],
+    [date,'北一二B',STORES[0].id,2,999,'乙','vivo V80 Lite','手機案'],
+    [date-1,'北一二B',STORES[0].id,3,1399,'丙',null,'好速'],
+    [date,'北一二B',STORES[0].id,1,null,'丁',null,'手機案'],
+    [date-30,'北一二B',STORES[0].id,7,1399,'上月',null,'好速']];
+  return {Sheets:{AQ量能:X.utils.aoa_to_sheet(summary,{dense:true}),RS_VoiceAQ:X.utils.aoa_to_sheet(entries,{dense:true})}};
+}
+const analyze=(b,all=true)=>mix.read(b,X,{kind:'AQ',cutoff:'2027-02-28',day:28},STORES,all);
+test('各區按明細人數、期間和表定資費排名，門市範圍只回傳北一二B',()=>{
+ const all=analyze(details()),u=all.regions[1];
+ assert.deepEqual(all.regions.map(r=>r.count),[1,6]);
+ assert.equal(u.low.fee,999);assert.equal(u.high.fee,1399);assert.equal(u.high.product,undefined);
+ assert.equal(u.missingFee,1);assert.equal(u.high.plan.n,3);assert.equal(u.broadband.n,3);assert.equal(u.focus.n,2);
+ assert.deepEqual(analyze(details(),false).regions.map(r=>r.name),['北一二B']);
+ assert.equal(all.stores[STORES[0].id].count,6);
+});
+test('對帳失敗只隱藏受影響區，缺分頁顯示原因',()=>{
+ const b=details();b.Sheets.AQ量能['!data'][3][3].v=2;
+ const result=analyze(b);assert.match(result.regions[0].issue,/核對/);assert.equal(result.regions[1].count,6);
+ delete b.Sheets.RS_VoiceAQ;assert.match(analyze(b).issue,/缺少/);
+});
