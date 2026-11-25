@@ -19,8 +19,15 @@ function options(question) {
 }
 function matchModel(rows,model){
   function keys(row){
-    const base=norm(row.model), spec=norm(row.model+(row.capacity || ''));
-    return [base,spec,norm(row.brand)+spec,norm(row.colorlessModel),...(row.models || row.sourceModels || []).map(norm)].filter(Boolean);
+    const names=[row.model,row.model+(row.capacity || ''),row.colorlessModel,...(row.models || row.sourceModels || [])].filter(Boolean);
+    const brand=norm(row.brand);
+    return names.flatMap(name=>{
+      const raw=norm(name);
+      // The formal catalog often spells out the brand or includes a (5G) marker.
+      // Retain storage, Pro/Max, RAM and bundle labels. Report every matching variant.
+      const variants=[raw,norm(name.replace(/\((?:4|5)G\)/gi,''))];
+      return variants.flatMap(v=>[v,brand+v,brand && v.startsWith(brand)?v.slice(brand.length):v]);
+    });
   }
   const exact=rows.filter(row=>keys(row).includes(model));
   if(exact.length)return exact;

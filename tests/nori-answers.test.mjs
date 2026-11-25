@@ -65,7 +65,7 @@ test('首頁所有卡片可依實際標題提問，子項指向正確系統',()=
 test('正式價表精確規格與資費條件，缺價與零元分開',async()=>{
   const {priceAnswer}=await import('../nori-price.mjs');
   const response={status:'ok',snapshot:{kind:'shopping',source_version_date:'2026-11-20',snapshot_hash:'a'.repeat(64),rows:[
-    {brand:'Test',model:'TestPhone 256GB',colorless_model:'TestPhone 256GB',retail_price:'7654',project_prices:{'測試專案／999型(24)':'0','測試專案／1399型(24)':'123'}}
+    {brand:'Test',model:'Test TestPhone 256GB (5G)',colorless_model:'Test TestPhone 256GB (5G)',retail_price:'7654',project_prices:{'測試專案／999型(24)':'0','測試專案／1399型(24)':'123'}}
   ]}};
   assert.match(priceAnswer(response,'TestPhone 256GB 月租999 24期 專案價'),/999.*0 元.*2026-11-20/);
   assert.doesNotMatch(priceAnswer(response,'TestPhone 256GB 月租999 24期 專案價'),/1399/);
