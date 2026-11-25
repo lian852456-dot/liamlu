@@ -6,9 +6,9 @@
   'use strict';
 
   const FIELD_HEADERS=Object.freeze({
-    reporter:['填報人員'],
+    reporter:['填報人員','填單人員'],
     organization:['面談人員組織'],
-    employeeId:['面談人員編號'],
+    employeeId:['面談人員編號','面談人員員編'],
     interviewee:['面談人員'],
     reason:['面談原因'],
     formStatus:['表單狀態'],
@@ -30,6 +30,11 @@
   ]);
 
   function text(value){return String(value==null?'':value).replace(/[\u00a0\u3000]/g,' ').trim();}
+  function normalizeFormStatus(value){
+    const status=text(value);
+    return status==='己結案'?'已結案':status;
+  }
+  function isClosedStatus(value){return /已結案|已完成/.test(normalizeFormStatus(value));}
   function normalizeHeader(value){return text(value).replace(/\s+/g,'');}
   function pad(value){return String(value).padStart(2,'0');}
   function validDate(year,month,day){
@@ -112,7 +117,7 @@
       const raw={
         reporter:text(get('reporter')),organization:text(get('organization')),
         interviewee:text(get('interviewee')),reason:text(get('reason')),
-        formStatus:text(get('formStatus')),interviewDate:normalizeDate(get('interviewDate')),
+        formStatus:normalizeFormStatus(get('formStatus')),interviewDate:normalizeDate(get('interviewDate')),
         filledDate:normalizeDate(get('filledDate')),closedDate:normalizeDate(get('closedDate')),
         guidance:text(get('guidance')),feedback:text(get('feedback'))
       };
@@ -151,8 +156,7 @@
     (Array.isArray(records)?records:[]).forEach(row=>{
       if(text(row&&row.quarter)!==activeQuarter)return;
       const key=personKey(row&&row.interviewee);if(!key)return;
-      const status=text(row&&row.formStatus);
-      const target=/已結案|已完成/.test(status)?completed:inProgress;
+      const target=isClosedStatus(row&&row.formStatus)?completed:inProgress;
       if(!target.has(key))target.set(key,row);
     });
     const rows=people.map(person=>{
@@ -176,5 +180,5 @@
     return result;
   }
 
-  return Object.freeze({FIELD_HEADERS,REQUIRED_FIELDS,PERSISTED_FIELDS,normalizeHeader,normalizeDate,quarterForDate,quarterMonths,currentQuarter,detectHeader,parseMatrix,persistedRow,sameRecord,prepareImportRows,recordKey,personKey,quarterProgress,monthsEnding});
+  return Object.freeze({FIELD_HEADERS,REQUIRED_FIELDS,PERSISTED_FIELDS,normalizeFormStatus,isClosedStatus,normalizeHeader,normalizeDate,quarterForDate,quarterMonths,currentQuarter,detectHeader,parseMatrix,persistedRow,sameRecord,prepareImportRows,recordKey,personKey,quarterProgress,monthsEnding});
 });
