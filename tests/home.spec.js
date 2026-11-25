@@ -21,9 +21,10 @@ const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.sit
 const UPLOAD_URL = 'quick-upload.html';
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'kpi-battle.html#awards', 'index.html', 'gold-medal.html',
-  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'tradein-progress.html', 'threec-query.html',
+  'tradein-progress.html', 'daily-log-dashboard.html',
+  'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html',
   'access-management.html', 'department-ops.html', 'readonly-dashboard.html', 'patrol.html',
-  'operations-brief.html', 'tradein-brief.html', 'daily-log-dashboard.html', 'live-battle.html', UPLOAD_URL,
+  'operations-brief.html', 'tradein-brief.html', 'live-battle.html', UPLOAD_URL,
   'phone-stock-dashboard.html'
 ];
 const DAILY_API = 'https://script.google.com/macros/s/AKfycbxVAnQy9VnKF03CwZlwCENHs-GVAwpS4yGXjhFIn-t0jAon5nKcp-pRVFBZjUBogdW6/exec';
@@ -142,9 +143,9 @@ async function changeKeys(page, keys) {
 test('首頁保留 PR179 個績入口與 PR181 測試入口移除，逐一核對實際連結', async ({page}) => {
   const {calls,errors} = await start(page);
   await ready(page);
-  await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(4);
-  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(7);
-  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(10);
+  await expect(page.locator('[aria-label="常用入口"] .card')).toHaveCount(6);
+  await expect(page.locator('[aria-label="同仁大廳"] .card')).toHaveCount(6);
+  await expect(page.locator('[aria-label="督導專區"] .card')).toHaveCount(9);
   expect(await page.locator('a.card').evaluateAll(cards => cards.map(card => card.getAttribute('href')))).toEqual(EXPECTED_HREFS);
   await expect(page.locator('.quick-card').first()).toHaveAttribute('href','kpi-battle.html');
   await expect(page.locator('.quick-card').first()).toContainText('KPI 戰情');
@@ -184,11 +185,9 @@ for (const viewport of [{width:1280,height:1300},{width:390,height:844},{width:3
     await start(page,{viewport}); await ready(page); await noOverflow(page);
     await expect(page.locator('a.card:visible')).toHaveCount(EXPECTED_HREFS.length);
     const boxes = await page.locator('.quick-card').evaluateAll(cards => cards.map(card => card.getBoundingClientRect().toJSON()));
-    if (viewport.width >= 1280) expect(new Set(boxes.map(box => box.y)).size).toBe(1);
-    else {
-      expect(boxes[0].y).toBe(boxes[1].y);
-      expect(boxes[2].y).toBe(boxes[3].y);
-      expect(boxes[2].y).toBeGreaterThan(boxes[0].y);
+    const rowSizes = [...new Set(boxes.map(box => box.y))].map(y => boxes.filter(box => box.y === y).length);
+    expect(rowSizes).toEqual(viewport.width >= 1280 ? [3, 3] : [2, 2, 2]);
+    if (viewport.width < 1280) {
       const staffBoxes = await page.locator('.staff-grid .card').evaluateAll(cards => cards.map(card => card.getBoundingClientRect().toJSON()));
       expect(staffBoxes.every((box,index) => index === 0 || box.y > staffBoxes[index - 1].y)).toBe(true);
     }

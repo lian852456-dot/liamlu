@@ -8,17 +8,27 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   function removeSaved(){try{storage?.removeItem(storageKey);}catch{}}
   function sessionState(name){try{options.onSessionState?.(name);}catch{}}
   function rejectLogin(category){try{options.onAuthRejection?.(category);}catch{}throw new Error('B_AUTH_DENIED');}
-  function savedSession(deviceId){
+  const loginTtl=30*60*1000, battleTtl=24*60*60*1000;
+  function battleDeadline(proof){
+    const end=proof.battleExpiresAt;
+    return proof.battleViewAvailable===true && Number.isSafeInteger(end) &&
+      end<=proof.expiresAt-loginTtl+battleTtl ? end : 0;
+  }
+  function savedSession(deviceId,forLogout=false){
     let reason='invalid';
     try {
       const value=JSON.parse(storage?.getItem(storageKey)||'null');
       if(!value){sessionState('missing');return null;}
       if(value.logoutEpoch!==(options.logoutEpoch?.()||'')){reason='epoch';throw Error('B_AUTH_DENIED');}
       if(value.deviceId!==deviceId){reason='device';throw Error('B_AUTH_DENIED');}
-      if(Number.isSafeInteger(value.expiresAt)&&value.expiresAt<=now()){reason='expired';throw Error('B_AUTH_DENIED');}
       if(value.v!==1 || value.owner!==ownerExecUrl || value.logoutEpoch!==(options.logoutEpoch?.()||'') || value.deviceId!==deviceId ||
         !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(value.token) || !Number.isSafeInteger(value.expiresAt) ||
-        value.expiresAt<=now() || value.expiresAt>now()+1800000)throw Error('B_AUTH_DENIED');
+        value.expiresAt>now()+loginTtl)throw Error('B_AUTH_DENIED');
+      if(value.battleExpiresAt!==undefined && !battleDeadline(value))throw Error('B_AUTH_DENIED');
+      if(value.expiresAt<=now() && !((options.battleView || forLogout) && battleDeadline(value)>now())){
+        if(battleDeadline(value)>now()){sessionState('expired');return null;}
+        reason='expired';throw Error('B_AUTH_DENIED');
+      }
       sessionState('restored');return value;
     }catch{sessionState(reason);removeSaved();return null;}
   }
@@ -36,7 +46,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   function saveLease(result,deviceId,expected){
     if(expected!==generation || !/^B1_[a-f0-9]_[a-f0-9]{64}$/.test(result.token) || !Number.isSafeInteger(result.expiresAt) || result.trustSource!=='password-bound' || result.expiresAt<=now() || result.expiresAt>now()+1800000)throw Error('B_AUTH_DENIED');
     session={deviceId,token:result.token};expiresAt=result.expiresAt;
-    if(storage)storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));
+    if(storage)storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt,...(result.battleViewAvailable===true?{battleViewAvailable:true}:{})}));
     return {expiresAt,trustSource:result.trustSource};
   }
   function suspend(){generation++;session=null;expiresAt=0;reads.clear();for(const controller of requests)controller.abort();requests.clear();}
@@ -97,7 +107,7 @@ function createDashboardBClient(ownerExecUrl, options={}) {
       session={deviceId,token:result.token};expiresAt=result.expiresAt;
       if(expiresAt<=now()){clear();rejectLogin('expiry-past');}
       if(expiresAt>now()+1800000){clear();rejectLogin('expiry-future');}
-      if(storage){try{storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt}));}
+      if(storage){try{storage.setItem(storageKey,JSON.stringify({v:1,owner:ownerExecUrl,logoutEpoch:options.logoutEpoch?.()||'',...session,expiresAt,...(result.battleViewAvailable===true?{battleViewAvailable:true}:{})}));}
         catch{try{await post({action:'employee_logout',...session});}finally{clear();}throw Error('B_STORAGE_UNAVAILABLE');}}
       return {expiresAt,trustSource:result.trustSource};
     },
@@ -134,11 +144,23 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     },
     async read(kind) {if(!['private','kpi'].includes(kind))throw new Error('B_AUTH_DENIED');return protectedPost(kind==='private'?'employee_private_read':'employee_kpi_read');},
     async readBundle(includeReports=false) {
-      const result=await protectedPost('employee_dashboard_read',includeReports===true?{includeReports:true}:{});
-      if(result.expiresAt!==expiresAt || result.trustSource!=='password-bound' || typeof result.phoneEligible!=='boolean' ||
+      const proof=options.battleView && !includeReports ? savedSession(lastDeviceId) : null;
+      const battle=proof?.battleViewAvailable===true;
+      const result=await protectedPost('employee_dashboard_read',includeReports===true?{includeReports:true}:battle?{battleView:true}:{});
+      if(battle && (result.expiresAt!==proof.expiresAt || !(battleDeadline({...proof,battleExpiresAt:result.battleExpiresAt})>now()) ||
+        proof.battleExpiresAt!==undefined && result.battleExpiresAt!==proof.battleExpiresAt))throw Error('B_AUTH_DENIED');
+      if((!battle && result.expiresAt!==expiresAt) || result.trustSource!=='password-bound' || typeof result.phoneEligible!=='boolean' ||
         result.privateResult?.status!=='ok' || result.kpiResult?.status!=='ok' ||
         includeReports===true && (result.reportsResult?.schema!=='daily-report-bundle-v1' || !Array.isArray(result.reportsResult.segments) || result.reportsResult.segments.length!==3))throw new Error('B_AUTH_DENIED');
       return result;
+    },
+    acceptBattleLease(bundle){
+      const proof=savedSession(lastDeviceId);
+      if(!options.battleView || !proof || proof.token!==session?.token || proof.expiresAt!==bundle.expiresAt ||
+        !Number.isSafeInteger(bundle.battleExpiresAt) || battleDeadline({...proof,battleExpiresAt:bundle.battleExpiresAt})<=now())throw Error('B_AUTH_DENIED');
+      storage.setItem(storageKey,JSON.stringify({...proof,battleExpiresAt:bundle.battleExpiresAt}));
+      expiresAt=bundle.battleExpiresAt;
+      return expiresAt;
     },
     async issueCityHandoff(challenge) {
       if(!challenge || Object.keys(challenge).sort().join('|')!=='audience|challengeId|expiresAt|nonceHash|worldId' ||
@@ -153,9 +175,9 @@ function createDashboardBClient(ownerExecUrl, options={}) {
     },
     interimInsuranceRead:dataDate=>protectedPost('employee_interim_insurance_read',{dataDate}),
     validate:()=>protectedPost('employee_session'),
-    restore(deviceId){suspend();lastDeviceId=deviceId;const value=savedSession(deviceId);if(!value)return null;session={deviceId:value.deviceId,token:value.token};expiresAt=value.expiresAt;lastPhoneToken=savedPhone(deviceId)?.phoneToken||'';return {expiresAt};},
+    restore(deviceId){suspend();lastDeviceId=deviceId;const value=savedSession(deviceId);if(!value)return null;session={deviceId:value.deviceId,token:value.token};expiresAt=options.battleView && battleDeadline(value) || value.expiresAt;lastPhoneToken=savedPhone(deviceId)?.phoneToken||'';return {expiresAt};},
     suspend,
-    async logout(transport=fetch) {const previous=session||savedSession(lastDeviceId),saved=savedPhone(lastDeviceId),phone=lastPhoneToken?{deviceId:lastDeviceId,phoneToken:lastPhoneToken}:null;clear();if(saved && saved.phoneToken===lastPhoneToken)removePhone();lastPhoneToken='';
+    async logout(transport=fetch) {const previous=session||savedSession(lastDeviceId,true),saved=savedPhone(lastDeviceId),phone=lastPhoneToken?{deviceId:lastDeviceId,phoneToken:lastPhoneToken}:null;clear();if(saved && saved.phoneToken===lastPhoneToken)removePhone();lastPhoneToken='';
       // Forget retires all phone leases and is idempotent if another tab already revoked it.
       if(phone)await post({action:'employee_phone_forget',deviceId:phone.deviceId,phoneToken:phone.phoneToken},generation,transport);
       else if(previous)await post({action:'employee_logout',deviceId:previous.deviceId,token:previous.token},generation,transport);

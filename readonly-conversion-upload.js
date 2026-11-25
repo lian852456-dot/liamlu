@@ -20,6 +20,19 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
 (function() {
   'use strict';
   let live = null, preview = null, generation = 0, busy = false;
+  async function readConversion(file){
+    if(!file.size||file.size>40*1024*1024||!/^.+\.xls[xm]$/i.test(file.name))throw Error('請選擇 40 MB 以內的締結率 Excel。');
+    const source=window.ReadonlyConversionSource;
+    const bytes=await file.arrayBuffer();
+    const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+    const workbook=source.readSource(bytes,XLSX,'array');
+    const snapshot=source.parseWorkbook(workbook,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
+    return {snapshot,workbook};
+  }
+  const capacity=window.createCapacityPanel($('capacity-panel'),async()=>{
+    const file=$('conversionFile').files[0];
+    return file?(await readConversion(file)).snapshot:null;
+  },undefined,{crossDistrict:true});
   const ids = ['conversionFile','renewalEvidenceFiles','conversionPreviewBtn','conversionRefreshBtn','conversionPublishBtn','conversionRollbackBtn'];
   function controls() {
     ids.forEach(id => { $(id).disabled = busy; });
@@ -50,7 +63,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     if (result.status !== 'ok' || !result.live) throw Error('版本讀回不完整');
     renderLive(result.live); return result.live;
   }
-  $('conversionFile').addEventListener('change', invalidate);
+  $('conversionFile').addEventListener('change', ()=>{invalidate();capacity.referenceChanged();});
   $('renewalEvidenceFiles').addEventListener('change', invalidate);
   $('conversionConfirm').addEventListener('change', controls);
   $('conversionRefreshBtn').addEventListener('click', async () => {
@@ -63,6 +76,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     if (busy) return; invalidate(); const ticket = generation;
     const file = $('conversionFile').files[0], supplements = [...$('renewalEvidenceFiles').files];
     const files = [file, ...supplements].filter(Boolean);
+    if (!files.length && capacity.hasFiles()) return capacity.analyze();
     if (!files.length || files.some(source=>!/\.xls[xm]$/i.test(source.name))) {
       return message('conversionMessage', '請選擇締結率原報或續約洞察補充 Excel（.xlsx 或 .xlsm）。', 'bad');
     }
@@ -74,14 +88,18 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
       const source=window.ReadonlyConversionSource, renewalEvidence=[];
       let snapshot=null, analysisIssue='';
       if(file){
-        const bytes=await file.arrayBuffer();
-        const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),b=>b.toString(16).padStart(2,'0')).join('');
-        const workbook=source.readSource(bytes,XLSX,'array');
-        snapshot=source.parseWorkbook(workbook,XLSX,{sha256,source_name:file.name,source_bytes:file.size});
+        const parsed=await readConversion(file);
+        snapshot=parsed.snapshot;
+        const workbook=parsed.workbook;
         try{
           const verified=source.parseEvidence(workbook,XLSX,file.name);
           if(verified)renewalEvidence.push(verified);
         }catch(error){analysisIssue=' · 原報洞察未更新：'+error.message;}
+      }
+      if(ticket!==generation)return;
+      if(capacity.hasFiles()){
+        if(capacity.ready())capacity.setConversion(snapshot);
+        else await capacity.analyze(snapshot);
       }
       for(const extra of supplements){
         const workbook=source.readSource(await extra.arrayBuffer(),XLSX,'array');
@@ -140,7 +158,7 @@ window.addEventListener('pagehide',()=>{authEpoch++;for(const request of request
     } catch (error) { live = null; message('conversionMessage', error.message, 'bad'); }
     finally { busy = false; controls(); }
   });
-  window.addEventListener('pagehide', () => { invalidate(); $('conversionFile').value = ''; $('renewalEvidenceFiles').value = ''; live = null;
+  window.addEventListener('pagehide', () => { capacity.reset(); invalidate(); $('conversionFile').value = ''; $('renewalEvidenceFiles').value = ''; live = null;
     $('conversionLive').textContent = '尚未核對版本。'; $('conversionPreviewText').textContent = '';
     $('conversionMessage').textContent = ''; controls(); });
 })();

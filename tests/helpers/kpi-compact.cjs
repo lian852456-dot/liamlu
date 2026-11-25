@@ -5,7 +5,7 @@ const Conversion=require('../../readonly-dashboard-core.js');
 const root=path.join(__dirname,'../..'),origin='https://kpi-compact.test';
 const names=['酒泉','永吉','復興南','杭州南','萬大','通化','大稻埕','三創','六張犁'];
 const keys=['AQ V+D 999 (含)以上','AQ V+D 1399 (含)以上','好速案銷售點數','RT V+D 999 (含)以上','RT V+D 1399 (含)以上','RT上線點數','5G銷售數','TTL AQ上線點數','預付卡開卡面額','特殊維繫用戶續約數','高高特維用戶續約數','自退數','解約後NP OUT','解約後NP OUT(督導績)','Device專案銷售數','重點Device銷售量','換約淨新增金額','空機、3C、物聯網及門市購營收','配件及其他營收','包膜與保貼營收','手機保險服務點數','HBO Max&Disney+&Prime Video銷售數','Netflix多享組銷售數','MyVideo&KKBOX','Apple&Google服務及雜誌週刊開通數'];
-async function start(page,{ttl=25*60*1000,failInitial=false,unknown=false,missingMetric=false,conversion}={}){
+async function start(page,{ttl=25*60*1000,battleView=false,failInitial=false,unknown=false,missingMetric=false,conversion}={}){
  const calls=[],errors=[],control={fail:failInitial,denied:false,delay:false},expiresAt=Date.now()+ttl;
  page.on('pageerror',error=>errors.push(error.message));
  const kpi={meta:{month:'2026-11',snapshotDay:8,monthDays:30,period:'2026/11/01 ~ 11/08',sourceFile:'1109.xlsx'},
@@ -20,7 +20,7 @@ async function start(page,{ttl=25*60*1000,failInitial=false,unknown=false,missin
   const request=route.request(),url=new URL(request.url());
   if(url.origin===origin){
    const name=path.basename(url.pathname),file=path.join(root,name);
-   if(!fs.existsSync(file)||!['.html','.js','.css'].includes(path.extname(name)))return route.abort();
+   if(!fs.existsSync(file)||!['.html','.js','.mjs','.css'].includes(path.extname(name)))return route.abort();
    return route.fulfill({contentType:name.endsWith('.html')?'text/html; charset=utf-8':name.endsWith('.css')?'text/css':'text/javascript',body:fs.readFileSync(file)});
   }
   if(url.hostname!=='script.google.com')return route.abort();
@@ -32,8 +32,8 @@ async function start(page,{ttl=25*60*1000,failInitial=false,unknown=false,missin
   }
   const proof={profile:{role:'employee',isTrusted:false},trustSource:'password-bound'};
   const result=action==='employee_status'?{status:'ok',enabled:true,passwordAvailable:true}
-   :action==='employee_login'?{status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,trustSource:'password-bound'}
-   :action==='employee_dashboard_read'?{status:'ok',expiresAt,trustSource:'password-bound',phoneEligible:false,privateResult:{status:'ok',...proof,snapshot:{kpiBattle:snapshot,...conversion}},kpiResult:{status:'ok',...proof,data:kpi}}:{status:'ok'};
+   :action==='employee_login'?{status:'ok',token:'B1_a_'+'a'.repeat(64),expiresAt,battleViewAvailable:battleView,trustSource:'password-bound'}
+   :action==='employee_dashboard_read'?{status:'ok',expiresAt,...(battleView && request.postDataJSON().battleView?{battleExpiresAt:expiresAt-1800000+86400000}:{}),trustSource:'password-bound',phoneEligible:false,privateResult:{status:'ok',...proof,snapshot:{kpiBattle:snapshot,...conversion}},kpiResult:{status:'ok',...proof,data:kpi}}:{status:'ok'};
   return route.fulfill({json:result});
  });
  await page.goto(origin+'/kpi-battle.html');
@@ -225,4 +225,86 @@ test('logout during a delayed update cannot restore protected data',async({page}
  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');await expect(page.locator('.compact-matrix')).toHaveCount(0);
  await page.waitForTimeout(500);await expect(page.locator('.compact-matrix')).toHaveCount(0);
  expect(await page.evaluate(()=>sessionStorage.getItem('north12b_password_session_v1'))).toBeNull();
+});
+
+test('four battle panels retain the verified view through the day and lock at the fixed deadline',async({page})=>{
+ await page.clock.install();
+ const f=await start(page,{ttl:1800000,battleView:true});
+ const requests=f.calls.length;
+ await page.clock.fastForward(23*60*60*1000);
+ for(const module of ['awards','personal','op','kpi','op']){
+  await page.locator('[data-b-module="'+module+'"]').click();
+  await expect(page).toHaveURL(new RegExp('#'+module+'$'));
+ }
+ await expect(page.locator('#panel-op-series iframe')).toBeVisible();
+ await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+ await page.reload();
+ await expect(page.locator('#panel-op-series iframe')).toBeVisible();
+ expect(f.calls).toHaveLength(requests);
+ await page.locator('[data-b-module="kpi"]').click();
+ await update(page);
+ await expect.poll(()=>f.calls.length).toBe(requests+1);
+ await expect(page.locator('.compact-matrix')).toBeVisible();
+ await page.clock.fastForward(60*60*1000+1000);
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
+ await expect(page.locator('#panel-op-series iframe, .compact-matrix')).toHaveCount(0);
+});
+
+test('focus tasks use the verified session, distinguish missing staff and filter both ends of the slider',async({page})=>{
+ const f=await start(page,{ttl:1800000,battleView:true});
+ await expect(page.locator('[data-b-module="op"] + button')).toHaveText('重點任務進度');
+ await page.evaluate(()=>{
+  const token=JSON.parse(sessionStorage.getItem('north12b_password_session_v1')).token;
+  const progress={actual:[3,1,0,0,0],targets:[3,1,null,2,1],rates:[1,1,null,0]};
+  const inventory=Object.fromEntries(['i17','i18','mac','S26','pixel10','pixel11'].map(k=>[k,[1,0,0]]));
+  const stores=['測試一店','測試二店'].map((name,i)=>({...progress,name,code:'TEST'+i,x500Met:false,inventory}));
+  const people=[1,3,4].map((idle,i)=>({name:'測＊'+i,code:'TEST0',idle,iphone:1,actual:[1,0,0,0,0]}));
+  const report={area:{...progress,x500Missing:2},dates:['2026-11-01','2026-11-02'],stores,people};
+  sessionStorage.setItem('north12b.focus-tasks.v1',JSON.stringify({token,report}));
+ });
+ await page.locator('[data-b-module="focus-tasks"]').click();
+ const frame=page.frameLocator('#panel-focus-tasks iframe'), slider=frame.getByRole('slider');
+ await expect(frame.locator('#people tr')).toHaveCount(3);
+ await slider.press('End');await expect(frame.locator('#people tr')).toHaveCount(1);
+ await expect(frame.locator('#people tr')).toContainText('優異');
+ await slider.press('Home');await expect(frame.locator('#people tr')).toHaveCount(1);
+ await expect(frame.locator('#people tr')).toContainText('落後');
+ await frame.locator('#store').selectOption('TEST1');
+ await expect(frame.locator('#people')).toContainText('個人表未列');
+ await page.locator('[data-b-module="op"]').click();
+ await page.locator('[data-b-module="focus-tasks"]').click();
+ await expect(frame.locator('#store')).toHaveValue('TEST1');
+ await page.reload();await expect(frame.locator('#people tr')).toHaveCount(3);
+ await page.locator('.b-more summary').click();await page.locator('[data-b-logout]').click();
+ await expect(page.locator('#panel-focus-tasks iframe')).toHaveCount(0);
+ expect(await page.evaluate(()=>sessionStorage.getItem('north12b.focus-tasks.v1'))).toBeNull();
+ expect(f.errors).toEqual([]);
+});
+
+test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清除',async({page})=>{
+ await page.route('**/assets/vendor/xlsx.full.min.js',route=>route.fulfill({
+  contentType:'text/javascript',body:fs.readFileSync(path.join(root,'assets/vendor/xlsx.full.min.js'))
+ }));
+ const {calls}=await start(page,{ttl:1800000,battleView:true});
+ const entry=page.getByRole('button',{name:'締結率',exact:true});
+ await expect(page.locator('[data-b-module="kpi"] + button')).toHaveText('締結率');
+ const requestCount=calls.length;
+ await entry.click();
+ const report=page.frameLocator('#panel-conversion iframe');
+ await expect(page).toHaveURL(/#conversion$/);
+ await expect(report.locator('#back')).toBeHidden();
+ const XLSX=require('../../assets/vendor/xlsx.full.min.js'),book=XLSX.utils.book_new();
+ const rows=[['資料起日','截止日','區別','店碼','店名','AQ上線數','AQ來客數','RT續約數','RT合格來客數'],
+  ['2026-11-01','2026-11-03','北一二B','DNB10001','示範店',54,120,4,10]];
+ XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(rows),'部區月累計');
+ await report.locator('#files').setInputFiles({name:'sample.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:XLSX.write(book,{type:'buffer',bookType:'xlsx'})});
+ await expect(report.locator('#status')).toContainText('sample.xlsx');
+ await expect(report.locator('#full')).toBeVisible();
+ await page.locator('[data-b-module="kpi"]').click();
+ await entry.click();
+ await expect(report.locator('#overview')).toContainText('45.00%');
+ expect(calls.length).toBe(requestCount);
+ await page.locator('.b-more summary').click();
+ await page.locator('[data-b-logout]').click();
+ await expect(page.locator('#panel-conversion iframe')).toHaveCount(0);
 });

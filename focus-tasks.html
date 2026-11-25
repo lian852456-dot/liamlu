@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'">
+<title>重點任務進度｜北一二B</title>
+<link rel="stylesheet" href="op-series.css"><link rel="stylesheet" href="focus-tasks.css">
+<script defer src="assets/vendor/xlsx.full.min.js"></script><script type="module" src="focus-tasks.mjs"></script>
+</head><body><main>
+<header><div><h1>重點任務進度</h1><p id="period">北一二B</p></div><div class="report-actions"><label id="importBox" class="file">更新本機報表<input type="file" id="file" accept=".xlsx"></label><button type="button" id="exportReadonly" hidden>一鍵匯出唯讀版</button></div></header>
+<p id="status" role="status">選擇「重點機型」Excel，查看門市及個人進度。</p>
+<div id="report" hidden>
+<section><h2>全區任務</h2><div class="metrics" id="metrics"></div></section>
+<section><h2>九店進度</h2><p>各格顯示實績／目標。綠色達到當期進度，紅色落後。充電多缺門市目標時只列件數。</p>
+<div class="scroll"><table class="overview"><thead id="shopHead"></thead><tbody id="shops"></tbody></table></div></section>
+<section><h2>同仁表現</h2><div class="controls">
+<label>門市 <select id="store"></select></label>
+<div class="spectrum"><label for="band">表現篩選</label><div class="track"><input type="range" id="band" min="0" max="2" step="1" value="1"><div class="ticks"><span>落後</span><span>全部</span><span>優異</span></div></div></div>
+</div><p id="personCount" aria-live="polite"></p><p>依 i18、Mac、充電多、AI 眼鏡、X500 五項動店。完成 3～5 項為優異，2 項為一般，0～1 項為落後。</p>
+<div class="scroll"><table class="overview"><thead id="personHead"></thead><tbody id="people"></tbody></table></div>
+<p id="coverage"></p></section>
+<details><summary>機型庫存與銷量</summary><label>系列 <select id="family"></select></label>
+<div class="scroll"><table><thead><tr><th>門市</th><th>庫存</th><th>銷量</th><th>去化率</th></tr></thead><tbody id="inventory"></tbody></table></div></details>
+</div></main></body></html>

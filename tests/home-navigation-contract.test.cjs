@@ -38,15 +38,15 @@ function cardFor(source, href) {
 }
 
 test('home navigation retains PR179 performance and PR181 lab removal', () => {
-  assert.equal(cards(navigation('常用入口')).length, 4);
+  assert.equal(cards(navigation('常用入口')).length, 6);
   const staffHrefs = cards(navigation('同仁大廳')).map(card => card.match(/href="([^"]+)"/)[1]);
   assert.deepEqual(staffHrefs, [
     'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html',
     'https://twm-store-inspection.liamlu245.chatgpt.site/',
-    'tradein-progress.html', 'threec-query.html'
+    'threec-query.html'
   ]);
-  assert.equal(cards(navigation('督導專區')).length, 10);
-  assert.equal(cards(html).length, 4 + staffHrefs.length + 10);
+  assert.equal(cards(navigation('督導專區')).length, 9);
+  assert.equal(cards(html).length, 6 + staffHrefs.length + 9);
 });
 
 test('staff gold lookup lives under performance tools and uses the existing viewer', () => {
@@ -98,7 +98,7 @@ test('home omits the import lab entry while retaining its maintenance page and f
 });
 
 test('home and APP open the v6 recovery query and retain target progress navigation', () => {
-  const area=cardFor(navigation('同仁大廳'),'tradein-progress.html');
+  const area=cardFor(navigation('常用入口'),'tradein-progress.html');
   assert.doesNotMatch(navigation('同仁大廳'), /href="tradein-query\.html"/);
   const system=fs.readFileSync(path.resolve(__dirname,'../threec-query.html'),'utf8');
   assert.match(system, /href="tradein-query\.html"/);

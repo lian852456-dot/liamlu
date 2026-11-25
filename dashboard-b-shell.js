@@ -64,7 +64,7 @@ function accessFailureMessage(error,stage='validate'){
   '；尚未確認失敗原因，畫面已鎖定。可按「重新核驗」重試，或在本頁輸入員編與指定密碼重新登入。';
 }
 function state(name){interimInsuranceCheck?.session(name==='active' && active && confirmed && expiresAt>Date.now());if(panel){panel.dataset.state=name;panel.querySelector('h2').textContent=name==='active'?(host?.ownerPhone&&client?.hasPhone()?'手機自動登入已啟用':'同仁專區已登入'):name==='checking'?'正在確認登入':name==='loading'?'正在登入這台裝置':(host?.ownerPhone?'首次驗證與手機綁定':'員編與密碼登入');panel.querySelector('[data-b-phone]').hidden=!(name==='active'&&host?.ownerPhone&&host.phoneEligible&&!client?.hasPhone());
- const lease=panel.querySelector('.b-lease');if(lease){lease.hidden=name!=='active';lease.textContent=name==='active'?`登入至 ${new Date(expiresAt).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit'})}（臺北）` : '';}
+ const lease=panel.querySelector('.b-lease');if(lease){lease.hidden=name!=='active';lease.textContent=name==='active'?`登入至 ${new Date(expiresAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}（臺北）` : '';}
 }}
 function markLegacyRoots(){
  const roots=[];
@@ -87,16 +87,17 @@ function showLegacyAccess(){
 }
 function clearDataCache(){scope.clearTimeout(dataCacheTimer);try{scope.sessionStorage.removeItem(DATA_CACHE_KEY);}catch{}}
 function currentProof(){try{return JSON.parse(scope.sessionStorage.getItem('north12b_password_session_v1')||'null');}catch{return null;}}
+function viewDeadline(proof){return host?.battleView && proof.battleExpiresAt || proof.expiresAt;}
 function cachedData(){
  if(host?.includeReports)return null;
  try{
   const value=JSON.parse(scope.sessionStorage.getItem(DATA_CACHE_KEY)||'null'),proof=currentProof(),now=Date.now();
-  if(!value)return null;
+  if(!value || (host.battleView && proof?.battleViewAvailable && !proof.battleExpiresAt))return null;
   if(value.v!==1 || !proof || value.owner!==OWNER || value.token!==proof.token || value.deviceId!==proof.deviceId ||
-    value.logoutEpoch!==proof.logoutEpoch || value.expiresAt!==proof.expiresAt || !Number.isSafeInteger(value.savedAt) ||
-    value.savedAt>now || proof.expiresAt<=now)throw Error('B_CACHE_EXPIRED');
+    value.logoutEpoch!==proof.logoutEpoch || value.expiresAt!==viewDeadline(proof) || !Number.isSafeInteger(value.savedAt) ||
+    value.savedAt>now || viewDeadline(proof)<=now)throw Error('B_CACHE_EXPIRED');
   checkProfile(value.privateResult);checkProfile(value.kpiResult);
-  scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,proof.expiresAt-now);
+  scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,viewDeadline(proof)-now);
   return {privateResult:value.privateResult,kpiResult:value.kpiResult,loadedAt:value.savedAt};
  }catch{clearDataCache();return null;}
 }
@@ -104,8 +105,8 @@ function saveDataCache(privateResult,kpiResult){
  if(host?.ownerPhone || host?.includeReports)return;
  const proof=currentProof();if(!proof)return;
  try{scope.sessionStorage.setItem(DATA_CACHE_KEY,JSON.stringify({v:1,owner:OWNER,token:proof.token,deviceId:proof.deviceId,
-  logoutEpoch:proof.logoutEpoch,expiresAt:proof.expiresAt,savedAt:lastLoadedAt||Date.now(),privateResult,kpiResult}));
-  scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,Math.max(0,proof.expiresAt-Date.now()));
+  logoutEpoch:proof.logoutEpoch,expiresAt:viewDeadline(proof),savedAt:lastLoadedAt||Date.now(),privateResult,kpiResult}));
+  scope.clearTimeout(dataCacheTimer);dataCacheTimer=scope.setTimeout(clearDataCache,Math.max(0,viewDeadline(proof)-Date.now()));
  }catch{clearDataCache();}
 }
 function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true){
@@ -132,12 +133,16 @@ function expireSession(){
  // resumePhone clears the expired view before sending any request.
  scope.clearTimeout(expiryTimer);
  if(host.ownerPhone){if(loading)return;active=false;confirmed=false;acceptedProof=null;void resumePhone();}
- else wipe('登入已到期，請重新輸入指定密碼。');
+ else if(!host.battleView && currentProof()?.battleExpiresAt>Date.now()){
+  // The ordinary session ended. Its battle-only snapshot can still be opened in this tab.
+  client.suspend();epoch++;active=false;confirmed=false;expiresAt=0;acceptedProof=null;checking=null;
+  host.clear();state('locked');message('此入口登入已到期，請重新登入。');
+ }else wipe('登入已到期，請重新輸入指定密碼。');
 }
 function scheduleExpiry(){acceptedProof=currentProof();scope.clearTimeout(expiryTimer);expiryTimer=scope.setTimeout(expireSession,Math.max(0,expiresAt-Date.now()));}
 async function logout(note='已登出指定密碼通道；裝置綁定保留。',transport){
  const operation=client?.logout(transport);wipe(host.ownerPhone?'已登出並取消手機自動登入。':note,false);
- try{await operation;return true;}catch{message(host.ownerPhone?'本機已登出；伺服器撤銷未確認，請連線後由人員與裝置管理解除手機自動登入。':'畫面已清除；伺服器登出未確認，請關閉本頁。原 session 最多存活至原30分鐘期限。');return false;}
+ try{await operation;return true;}catch{message(host.ownerPhone?'本機已登出；伺服器撤銷未確認，請連線後由人員與裝置管理解除手機自動登入。':'畫面已清除；伺服器登出未確認，請關閉本頁。原登入期限屆滿後即失效。');return false;}
 }
 function checkProfile(result){if(!result?.profile || result.profile.role!=='employee' || result.profile.isTrusted!==false || result.trustSource!=='password-bound')throw Error('B_AUTH_DENIED');}
 function localSessionValid(){
@@ -147,7 +152,7 @@ function localSessionValid(){
  try{logoutEpoch=JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';deviceId=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
  if(!acceptedProof || !proof || proof.owner!==OWNER || proof.token!==acceptedProof.token ||
    proof.deviceId!==acceptedProof.deviceId || proof.deviceId!==deviceId ||
-   proof.logoutEpoch!==acceptedProof.logoutEpoch || proof.logoutEpoch!==logoutEpoch || proof.expiresAt!==expiresAt){
+   proof.logoutEpoch!==acceptedProof.logoutEpoch || proof.logoutEpoch!==logoutEpoch || viewDeadline(proof)!==expiresAt){
   wipe('登入狀態已變更，請重新登入。');return false;
  }
  return true;
@@ -173,7 +178,7 @@ async function refresh(allowPhone=true,forceData=false){
  if(confirmed && !forceData)return true;
  const expected=epoch;let stage='validate';if(!confirmed)state('checking');
  checking=(async()=>{try{
-  const cached=!forceData && cachedData();
+  const cached=!host.sessionOnly && !forceData && cachedData();
   const needsData=!host.sessionOnly && (!confirmed || forceData) && !cached;
   // An existing, locally valid lease and its matching snapshot are enough
   // when returning. Explicit refresh performs a protected server request.
@@ -183,9 +188,10 @@ async function refresh(allowPhone=true,forceData=false){
   stage=needsData?'read':'validate';
   const [validated,bundle]=await Promise.all([validation,data]),lease=validated||bundle;
   if(expected!==epoch || !active || !localSessionValid())return false;
-  if(expiresAt<=Date.now() || lease && lease.expiresAt!==expiresAt)throw Error('B_AUTH_DENIED');
+  if(lease && lease.expiresAt!==acceptedProof.expiresAt)throw Error('B_AUTH_DENIED');
   if(lease)host.phoneEligible=lease.phoneEligible===true;
   if(bundle){const {privateResult,kpiResult}=bundle;checkProfile(privateResult);checkProfile(kpiResult);
+   if(host.battleView && bundle.battleExpiresAt!==undefined){expiresAt=client.acceptBattleLease(bundle);scheduleExpiry();}
    paint({privateResult,kpiResult,...(host.includeReports?{reportsResult:bundle.reportsResult}:{})});saveDataCache(privateResult,kpiResult);
   }else if(!confirmed){
    if(host.sessionOnly)paint({lease});
@@ -194,7 +200,7 @@ async function refresh(allowPhone=true,forceData=false){
   confirmed=true;state('active');
   message(host.sessionOnly?'可直接開啟同仁專區；換頁不延長登入期限。':`上次讀取：${loadedTime()}。已載入的 KPI、台獎與個績會保留；需要最新資料時請按「重新讀取資料」。`);return true;
  }catch(error){
-  if(expected!==epoch || restoreReplacement())return false;
+  if(expected!==epoch || !localSessionValid())return false;
   if(error.message==='B_DISABLED'){wipe('指定密碼通道已關閉，請重新確認。');return false;}
   if(error.message==='B_AUTH_DENIED' && allowPhone && host.ownerPhone && client.hasPhone()){checking=null;active=false;confirmed=false;return resumePhone();}
   if(error.message==='B_AUTH_DENIED'){wipe('登入或目前會話未通過驗證，請重新登入。');return false;}
@@ -237,7 +243,7 @@ async function resume(replacement=false){
  if(active || loading || checking)return;
  const started=0; // First usable frame includes document and script loading.
  let existingDevice='';try{existingDevice=scope.localStorage.getItem(DEVICE_KEY)||'';}catch{}
- const lease=client.restore(existingDevice);if(!lease){if(host.ownerPhone && !replacement)await resumePhone(started);return;}
+ const lease=client.restore(existingDevice);if(!lease){if(!currentProof())clearDataCache();if(host.ownerPhone && !replacement)await resumePhone(started);return;}
  epoch++;active=true;expiresAt=lease.expiresAt;
  scheduleExpiry();
  // A return from publishing must reload the protected snapshot even with a valid cached session.
@@ -247,11 +253,11 @@ function navigateVerified(module){guarded=true;try{host.navigate(module);}finall
 function configure(value){host=value;if(ready)mount();}
 function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  let storage,phoneStorage;try{storage=scope.sessionStorage;if(host.ownerPhone)phoneStorage=scope.localStorage;}catch{}
- client=createDashboardBClient(OWNER,{storage,phoneStorage,onAuthRejection:category=>timing('reject:employee_login:'+category,0,'error'),onRequest:row=>timing('request:'+row.action,row.ms,row.outcome),onServerTiming:row=>timing('server:'+row.action+':'+row.name,row.ms),onSessionState:name=>timing('session:'+name,0),logoutEpoch:()=>{try{return JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});panel=document.createElement('section');panel.id='dashboard-b-access';panel.setAttribute('aria-label','指定密碼登入');panel.dataset.state='locked';
+ client=createDashboardBClient(OWNER,{storage,phoneStorage,battleView:host.battleView===true,onAuthRejection:category=>timing('reject:employee_login:'+category,0,'error'),onRequest:row=>timing('request:'+row.action,row.ms,row.outcome),onServerTiming:row=>timing('server:'+row.action+':'+row.name,row.ms),onSessionState:name=>timing('session:'+name,0),logoutEpoch:()=>{try{return JSON.parse(scope.localStorage.getItem('north12b_portal_logout_event_v1')||'null')?.id||'';}catch{return '';}}});panel=document.createElement('section');panel.id='dashboard-b-access';panel.setAttribute('aria-label','指定密碼登入');panel.dataset.state='locked';
  panel.innerHTML=`<h2>員編與密碼登入</h2>
  <form data-b-form><label>員工編號<input data-b-employee required autocomplete="username" autocapitalize="characters" maxlength="12" placeholder="輸入員工編號"></label><label>指定密碼<input data-b-password required type="password" autocomplete="off" maxlength="1024" placeholder="輸入指定密碼"></label><button data-b-submit type="submit">登入這台裝置</button></form>
  <p data-b-message role="status">同仁首次登入會綁定這台裝置；已授權督導可跨裝置登入。</p>
- ${host.compactMobileLogin?'<details class="b-options" open><summary>登入與資料更新選項</summary>':''}<div class="b-toolbar"><nav class="b-modules" aria-label="資料入口"><button type="button" data-b-module="kpi">KPI</button><button type="button" data-b-module="awards">台獎</button><button type="button" data-b-module="personal">個績</button>${host.opSeries?'<button type="button" data-b-module="op">OP系列</button>':''}<button type="button" data-b-return>返回</button></nav><nav class="b-account" aria-label="登入管理"><button type="button" data-b-a>原員編通道</button><button type="button" data-b-phone hidden>綁定這支手機，之後免輸帳密</button><button type="button" data-b-refresh>${host.sessionOnly?'重新核驗登入':'重新讀取資料'}</button><button type="button" data-b-timing>載入計時</button><button type="button" data-b-logout>登出</button></nav></div>${host.compactMobileLogin?'</details>':''}`;
+ ${host.compactMobileLogin?'<details class="b-options" open><summary>登入與資料更新選項</summary>':''}<div class="b-toolbar"><nav class="b-modules" aria-label="資料入口"><button type="button" data-b-module="kpi">KPI</button>${host.conversionReport?'<button type="button" data-b-module="conversion">締結率</button>':''}<button type="button" data-b-module="awards">台獎</button><button type="button" data-b-module="personal">個績</button>${host.opSeries?'<button type="button" data-b-module="op">OP系列</button>':''}${host.focusTasks?'<button type="button" data-b-module="focus-tasks">重點任務進度</button>':''}<button type="button" data-b-return>返回</button></nav><nav class="b-account" aria-label="登入管理"><button type="button" data-b-a>原員編通道</button><button type="button" data-b-phone hidden>綁定這支手機，之後免輸帳密</button><button type="button" data-b-refresh>${host.sessionOnly?'重新核驗登入':'重新讀取資料'}</button><button type="button" data-b-timing>載入計時</button><button type="button" data-b-logout>登出</button></nav></div>${host.compactMobileLogin?'</details>':''}`;
  const style=document.createElement('style');style.textContent=`
  body.dashboard-b-password-mode .dashboard-b-legacy-root{display:none!important}
  body.dashboard-b-legacy-mode #dashboard-b-access{display:none!important}
