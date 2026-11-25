@@ -2,10 +2,21 @@
   'use strict';
   const C=window.North12OfficerCore,T=window.North12Trends,R=window.North12TrendReport,V=window.North12TrendView;
   const $=id=>document.getElementById(id), esc=C.safe, offline=$('report-snapshot');
+  const battleRegion=new URLSearchParams(window.location.search).get('view')==='kpi-b'?'北一二B':null;
+  function labelBattleReport(){
+    document.querySelector('header small').textContent='北一二B ／ KPI 戰情';
+    $('overviewTitle').textContent='北一二B與門市總覽';
+    document.title='北一二B｜KPI 戰情・締結率';
+  }
+  if(battleRegion){
+    labelBattleReport();
+    $('status').textContent='請選取本機 AQ／RT 原報，查看北一二B與各店表現。';
+    $('export').textContent='匯出所選範圍 HTML';
+  }
   let history=new Map(),sessionBatch='',model=null,scope=T.ALL,generation=0,packet=null,compact=false;
   let options={ch:'rt',base:'office',kind:'level',period:'wow',heatMetric:'rate',tierSource:'store',threshold:30};
   const option=(v,label=v)=>'<option value="'+esc(v)+'">'+esc(label)+'</option>';
-  const parts=()=>[...history.values()].filter(p=>p.region!==T.OFFICE);
+  const parts=()=>[...history.values()].filter(p=>p.region!==T.OFFICE&&(!battleRegion||p.region===battleRegion));
   function populate(){
     const active=parts(),latest=active.map(p=>p.cutoff).sort().at(-1);
     const months=T.unique(active.map(p=>p.period_start)).sort().reverse();
@@ -15,7 +26,8 @@
   function changeMonth(){
     const m=$('month').value,inputs=parts().filter(p=>p.period_start===m),end=inputs.map(p=>p.cutoff).sort().at(-1);
     $('end').min=m;$('end').max=end;$('end').value=end;
-    $('region').innerHTML=option(T.ALL)+C.REGIONS.map(r=>option(r)).join('');
+    $('region').innerHTML=battleRegion?option(battleRegion):option(T.ALL)+C.REGIONS.map(r=>option(r)).join('');
+    $('region').disabled=!!battleRegion;
     populateStores();refresh();
   }
   function populateStores(){
@@ -74,6 +86,7 @@
   }
   function loadPacket(value){
     if(value.schema!=='north12-trend-snapshot/v1'||!value.models?.length)throw Error('離線版本格式不符');
+    if(value.entry==='kpi-b')labelBattleReport();
     packet=value;scope=packet.models[0].scope;model=packet.models[0];options={...options,...packet.options};sessionBatch=packet.batch;
     $('month').innerHTML=option(model.month,model.month.slice(0,7));$('month').disabled=true;
     $('end').value=model.end;$('end').disabled=true;
@@ -100,6 +113,7 @@
     $('status').textContent='正在本機核對 '+files.length+' 份原報…';
     try{
       for(const file of files){filename=file.name;loaded.push(await parseFile(file));if(token!==generation)return;}
+      if(battleRegion&&!loaded.some(d=>d.stores.some(s=>s.region===battleRegion)))throw Error('選取的來源缺少北一二B門市');
       const next=T.apply(history,loaded);
       const ids=T.unique([...next.values()].map(p=>p.period_start+'|'+p.region+'|'+Object.values(p.tierSnapshots||{}).map(s=>s.sha256).sort().join(','))).sort().join('\n');
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ids));
@@ -120,15 +134,15 @@
     if(!model)return;
     try{
       const models=[model,...model.comparisons.filter(r=>r.id!==model.scope&&r.summary.stores).map(r=>R.build(history,model.end,r.id,model.whole))];
-      const value={schema:'north12-trend-snapshot/v1',batch:sessionBatch,models,options};
-      window.OfflineHtml.download(C.snapshotHtml(value,window.North12OfficerExportAssets),'北一二部_'+model.label+'_'+model.end+'.html');
+      const value={schema:'north12-trend-snapshot/v1',entry:battleRegion?'kpi-b':'department',batch:sessionBatch,models,options};
+      window.OfflineHtml.download(C.snapshotHtml(value,window.North12OfficerExportAssets),(battleRegion?'KPI戰情_':'北一二部_')+model.label+'_'+model.end+'.html');
     }catch(e){$('status').textContent='匯出失敗：'+e.message;}
   };
   if(offline)loadPacket(JSON.parse(offline.textContent));
   const legacy=$('officer-data');
   if(legacy){const d=C.validate(JSON.parse(legacy.textContent));history=T.apply(new Map(),[d]);sessionBatch=d.sha256.slice(0,12);populate();}
-  if(window.parent!==window && location.hash==='#summary'){
-    compact=true;document.body.classList.add('embedded','compact');
+  if(window.parent!==window && (location.hash==='#summary'||battleRegion)){
+    compact=!battleRegion;document.body.classList.add('embedded');document.body.classList.toggle('compact',compact);
     window.North12ReportDisplay=expanded=>{compact=!expanded;document.body.classList.toggle('compact',compact);};
     new ResizeObserver(()=>{window.frameElement?.setAttribute('height',String(document.querySelector('main').offsetHeight+10));}).observe(document.querySelector('main'));
   }

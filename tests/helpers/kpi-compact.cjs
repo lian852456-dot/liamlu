@@ -295,11 +295,20 @@ test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清�
  await expect(report.locator('#back')).toBeHidden();
  const XLSX=require('../../assets/vendor/xlsx.full.min.js'),book=XLSX.utils.book_new();
  const rows=[['資料起日','截止日','區別','店碼','店名','AQ上線數','AQ來客數','RT續約數','RT合格來客數'],
-  ['2026-11-01','2026-11-03','北一二B','DNB10001','示範店',54,120,4,10]];
+  ['2026-11-01','2026-11-03','北一二B','DNB10001','示範店',54,120,4,10],
+  ['2026-11-01','2026-11-03','北一二A','DNB10002','跨區驗收店',5,5,5,5]];
  XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(rows),'部區月累計');
  await report.locator('#files').setInputFiles({name:'sample.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:XLSX.write(book,{type:'buffer',bookType:'xlsx'})});
  await expect(report.locator('#status')).toContainText('sample.xlsx');
  await expect(report.locator('#full')).toBeVisible();
+ await expect(report.locator('#region option')).toHaveText(['北一二B']);
+ await expect(report.locator('#store option')).toHaveText(['全部門市','北一二B／示範店']);
+ const download=page.waitForEvent('download');
+ await report.getByRole('button',{name:'匯出所選範圍 HTML'}).click();
+ const html=fs.readFileSync(await (await download).path(),'utf8');
+ const snapshot=JSON.parse(html.match(/id="report-snapshot">([\s\S]*?)<\/script>/)[1]);
+ expect(snapshot.models.map(m=>m.scope)).toEqual(['北一二B','DNB10001']);
+ expect(JSON.stringify(snapshot)).not.toContain('跨區驗收店');
  await page.locator('[data-b-module="kpi"]').click();
  await entry.click();
  await expect(report.locator('#overview')).toContainText('45.00%');

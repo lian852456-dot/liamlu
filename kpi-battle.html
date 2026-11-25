@@ -343,7 +343,7 @@
   <div id="awardsBattleContent"><div class="kpi-empty">讀取台獎戰情資料中…</div></div>
 </main>
 
-<main id="panel-conversion" data-battle-panel aria-label="部區締結率分析" hidden></main>
+<main id="panel-conversion" data-battle-panel aria-label="北一二B締結率分析" hidden></main>
 <main id="panel-focus-tasks" data-battle-panel aria-label="重點任務進度" hidden></main>
 <main id="panel-op-series" data-battle-panel aria-label="OP系列" hidden></main>
 
@@ -370,9 +370,8 @@
     conversionPanel.hidden = !conversion;
     if (conversion && !conversionPanel.firstChild) {
       const frame = document.createElement('iframe');
-      frame.title = '北一二部締結率、來客趨勢與 Tier 洞察';
-      frame.addEventListener('load', () => frame.contentWindow?.North12ReportDisplay?.(true), {once:true});
-      frame.src = 'north12-officer.html#summary';
+      frame.title = '北一二B締結率、來客趨勢與 Tier 洞察';
+      frame.src = 'north12-officer.html?view=kpi-b';
       conversionPanel.append(frame);
     }
     focusPanel.hidden = !focus;
