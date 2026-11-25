@@ -249,3 +249,34 @@ test('four battle panels retain the verified view through the day and lock at th
  await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','locked');
  await expect(page.locator('#panel-op-series iframe, .compact-matrix')).toHaveCount(0);
 });
+
+test('focus tasks use the verified session, distinguish missing staff and filter both ends of the slider',async({page})=>{
+ const f=await start(page,{ttl:1800000,battleView:true});
+ await expect(page.locator('[data-b-module="op"] + button')).toHaveText('重點任務進度');
+ await page.evaluate(()=>{
+  const token=JSON.parse(sessionStorage.getItem('north12b_password_session_v1')).token;
+  const progress={actual:[3,1,0,0,0],targets:[3,1,null,2,1],rates:[1,1,null,0]};
+  const inventory=Object.fromEntries(['i17','i18','mac','S26','pixel10','pixel11'].map(k=>[k,[1,0,0]]));
+  const stores=['測試一店','測試二店'].map((name,i)=>({...progress,name,code:'TEST'+i,x500Met:false,inventory}));
+  const people=[1,3,4].map((idle,i)=>({name:'測＊'+i,code:'TEST0',idle,iphone:1,actual:[1,0,0,0,0]}));
+  const report={area:{...progress,x500Missing:2},dates:['2026-11-01','2026-11-02'],stores,people};
+  sessionStorage.setItem('north12b.focus-tasks.v1',JSON.stringify({token,report}));
+ });
+ await page.locator('[data-b-module="focus-tasks"]').click();
+ const frame=page.frameLocator('#panel-focus-tasks iframe'), slider=frame.getByRole('slider');
+ await expect(frame.locator('#people tr')).toHaveCount(3);
+ await slider.press('End');await expect(frame.locator('#people tr')).toHaveCount(1);
+ await expect(frame.locator('#people tr')).toContainText('優異');
+ await slider.press('Home');await expect(frame.locator('#people tr')).toHaveCount(1);
+ await expect(frame.locator('#people tr')).toContainText('落後');
+ await frame.locator('#store').selectOption('TEST1');
+ await expect(frame.locator('#people')).toContainText('個人表未列');
+ await page.locator('[data-b-module="op"]').click();
+ await page.locator('[data-b-module="focus-tasks"]').click();
+ await expect(frame.locator('#store')).toHaveValue('TEST1');
+ await page.reload();await expect(frame.locator('#people tr')).toHaveCount(3);
+ await page.locator('.b-more summary').click();await page.locator('[data-b-logout]').click();
+ await expect(page.locator('#panel-focus-tasks iframe')).toHaveCount(0);
+ expect(await page.evaluate(()=>sessionStorage.getItem('north12b.focus-tasks.v1'))).toBeNull();
+ expect(f.errors).toEqual([]);
+});
