@@ -108,3 +108,22 @@ test('讀回驗證比對所有保存欄位，不把同鍵舊內容當更新成�
   for(const field of model.PERSISTED_FIELDS)assert.equal(model.sameRecord(saved,{...saved,[field]:'舊內容'}),false,field);
   assert.equal(model.sameRecord(saved,undefined),false);
 });
+
+test('FR0207 匯出欄名與結案用字可辨識，舊紀錄的季度統計一致',()=>{
+  const sourceHeaders=headers.slice();
+  sourceHeaders[0]='填單人員 ';
+  sourceHeaders[2]='面談人員員編';
+  const record=duplicateRow.slice();
+  record[5]='己結案';
+  const parsed=model.parseMatrix([sourceHeaders,record,record]);
+  assert.equal(parsed.blocked,false);
+  assert.equal(parsed.duplicatesRemoved,1);
+  assert.equal(parsed.employeeIdsDiscarded,2);
+  const saved=parsed.rows[0];
+  assert.equal(saved.reporter,record[0]);
+  assert.equal(saved.formStatus,'已結案');
+  assert.equal(Object.hasOwn(saved,'employeeId'),false);
+  const stored={...saved,formStatus:'己結案'};
+  assert.equal(model.quarterProgress([{name:stored.interviewee}],[stored],stored.quarter).completed,1);
+  assert.equal(model.isClosedStatus('待回覆'),false);
+});
