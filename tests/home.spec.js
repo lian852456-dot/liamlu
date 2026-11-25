@@ -21,7 +21,7 @@ const STORE_INSPECTION_URL = 'https://twm-store-inspection.liamlu245.chatgpt.sit
 const UPLOAD_URL = 'quick-upload.html';
 const EXPECTED_HREFS = [
   'kpi-battle.html', 'kpi-battle.html#awards', 'index.html', 'gold-medal.html',
-  'tradein-progress.html', 'daily-log-dashboard.html',
+  'tradein-progress.html', 'daily-log-dashboard.html', 'city-play.html',
   'kpi.html', 'kpitry.html', 'gold-medal.html', 'audit-report.html', STORE_INSPECTION_URL, 'threec-query.html',
   'access-management.html', 'department-ops.html', 'readonly-dashboard.html', 'patrol.html',
   'operations-brief.html', 'tradein-brief.html', 'live-battle.html', UPLOAD_URL,
