@@ -305,8 +305,8 @@
     refreshOnResume:returnToDashboard,
     onPasswordLogin(){ if(returnToDashboard)openDashboard(); },
     showLegacyAccess(){ scope.location.href=returnToDashboard?'kpi-battle.html?login=approved-readonly':'kpi-battle.html#kpi'; },
-    sessionOnly:true,mountSelector:'#home-login',navigationSelector:'#zone-staff a, .quick-card',compactMobileLogin:true,
-    clear(){if(returnToDashboard)$('dashboard-login-return').hidden=true;passwordVerified=false;updateAccessNotice();},
+    sessionOnly:true,noriQuestions:true,mountSelector:'#home-login',navigationSelector:'#zone-staff a, .quick-card',compactMobileLogin:true,
+    clear(){scope.dispatchEvent(new Event('home-nori-access-cleared'));if(returnToDashboard)$('dashboard-login-return').hidden=true;passwordVerified=false;updateAccessNotice();},
     accept(){if(returnToDashboard)$('dashboard-login-return').hidden=false;passwordVerified=true;updateAccessNotice();if(!salesVerified){feeds.sales=pending('sales','同仁專區已登入，請由下方入口查看 KPI、台獎與個績；此提醒尚未讀取。');render();}},
     navigate(module){
       const targets={kpi:'kpi-battle.html#kpi',awards:'kpi-battle.html#awards',personal:'kpi-battle.html#personal',return:'#zone-staff'};
