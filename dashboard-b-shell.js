@@ -157,6 +157,36 @@ function localSessionValid(){
  }
  return true;
 }
+// Return a single formatted answer only for the verified ordinary homepage session.
+async function answerHomeQuestion(topic,question,signal){
+ const allowed=['kpi','awards','insurance','conversion','op','focus'];
+ const expected=epoch;
+ const valid=()=>host?.noriQuestions===true && host.sessionOnly && active && confirmed &&
+   !scope.PortalLogout?.isLocked() && !document.hidden && !signal?.aborted && epoch===expected && localSessionValid();
+ if(!allowed.includes(topic) || !valid())return {login:true};
+ try{
+  const {answerReport}=await import('./nori-answers.mjs');
+  if(!valid())return {login:true};
+  const bundle=await client.readBundle(false);
+  if(!valid())return {login:true};
+  if(bundle.expiresAt!==acceptedProof.expiresAt)throw Error('B_AUTH_DENIED');
+  checkProfile(bundle.privateResult);checkProfile(bundle.kpiResult);
+  let local=null;
+  if(topic==='op')local=JSON.parse(scope.localStorage.getItem('north12b.op-series.v1')||'null');
+  if(topic==='focus'){
+   const cached=JSON.parse(scope.sessionStorage.getItem('north12b.focus-tasks.v1')||'null');
+   if(cached?.token===acceptedProof.token)local=cached.report;
+  }
+  return answerReport(topic,question,bundle,local);
+ }catch(error){
+  if(error.message==='B_AUTH_DENIED' || error.message==='B_DISABLED'){
+   if(valid())wipe('請重新驗證登入。');
+   return {login:true};
+  }
+  if(!valid())return {login:true};
+  throw error;
+ }
+}
 async function recheck(){
  if(loading || checking || rechecking)return false;
  if(active)return refresh(true,true);
@@ -333,7 +363,7 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  if(host.startWithLegacy && !currentProof())showLegacyAccess();
  else void resume();
 }
-scope.DashboardB=Object.freeze({configure,active:()=>active,refresh,context:()=>epoch,metrics:()=>timings.map(row=>({...row})),recordTab:(name,ms)=>timing('tab:'+name,ms),leaveForA:async()=>{if(!DASHBOARD_B_CLIENT_ENABLED_)return;if(active || checking || loading)await logout('已返回原員編通道。');else{epoch++;client?.clear();}},clear:()=>wipe()});
+scope.DashboardB=Object.freeze({configure,active:()=>active,refresh,answerHomeQuestion,context:()=>epoch,metrics:()=>timings.map(row=>({...row})),recordTab:(name,ms)=>timing('tab:'+name,ms),leaveForA:async()=>{if(!DASHBOARD_B_CLIENT_ENABLED_)return;if(active || checking || loading)await logout('已返回原員編通道。');else{epoch++;client?.clear();}},clear:()=>wipe()});
 if(pendingHost)configure(pendingHost);
 document.addEventListener('DOMContentLoaded',()=>{ready=true;mount();},{once:true});
 })(window);

@@ -17,11 +17,13 @@
   <script defer src="patrol-question-versions.js"></script>
   <script defer src="home-reminder-model.js?v=20260930"></script>
   <script defer src="GasBClient.js?v=20261125-battle-lease"></script>
-  <script defer src="dashboard-b-shell.js?v=20261125-battle-lease"></script>
-  <script defer src="home.js?v=20261120-login-return-1"></script>
+  <script defer src="dashboard-b-shell.js?v=20261125-nori-questions"></script>
+  <script defer src="home.js?v=20261125-nori-questions"></script>
   <link rel="stylesheet" href="nori-helper.css?v=20261125-play">
   <script defer src="tradein-public-core.js?v=20261026-reviewed-support-1"></script>
-  <script defer src="nori-helper.js?v=20261125-tradein-answer"></script>
+  <script defer src="nori-catalog.js?v=20261125"></script>
+  <script defer src="gold-public-core.js?v=20261001-reasons-1"></script>
+  <script defer src="nori-helper.js?v=20261125-site-questions"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">跳至主要內容</a>
@@ -128,11 +130,11 @@
 <aside id="nori-helper" aria-label="海苔小幫手" hidden>
   <section id="nori-panel" aria-labelledby="nori-title" hidden>
     <div class="nori-heading"><h2 id="nori-title">海苔小幫手</h2><button id="nori-close" type="button" aria-label="收合海苔小幫手">×</button></div>
-    <p>想找哪份資料？</p>
+    <p>想查哪位同仁的進度，或想了解哪個工具？</p>
     <div id="nori-shortcuts" role="group" aria-label="常查項目"></div>
     <p id="nori-asked"></p>
     <div aria-live="polite" aria-atomic="true"><p id="nori-answer"></p><div id="nori-actions"></div></div>
-    <form id="nori-form"><label class="sr-only" for="nori-question">向海苔提問</label><input id="nori-question" maxlength="180" autocomplete="off" placeholder="例如：舊換新還差幾台？"><button type="submit">提問</button></form>
+    <form id="nori-form"><label class="sr-only" for="nori-question">向海苔提問</label><input id="nori-question" maxlength="180" autocomplete="off" placeholder="例如：通化本月 KPI 達成率？"><button type="submit">提問</button></form>
     <div class="nori-play" role="group" aria-label="和海苔玩">
       <button type="button" id="nori-pet">摸摸海苔</button>
       <button type="button" id="nori-toy">逗貓棒</button>
