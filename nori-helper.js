@@ -42,10 +42,43 @@
     respond(message);
     link(label, url);
   }
+  let activeRead;
+  let expectTradeinSubject = false;
+  function cancelRead() {
+    activeRead?.abort();
+    activeRead = null;
+  }
+  async function tradeinAnswer(question) {
+    const controller = new AbortController();
+    activeRead = controller;
+    respond('正在查詢舊換新進度…');
+    try {
+      const {answerTradein} = await import('./nori-tradein.mjs');
+      if (controller.signal.aborted) return;
+      const result = await answerTradein(question, controller.signal);
+      if (controller.signal.aborted) return;
+      expectTradeinSubject = Boolean(result.follow);
+      respond(result.message);
+      for (const person of result.choices || []) {
+        actions.append(button(person.store, person.store + person.masked + '舊換新筆數'));
+      }
+      link('查看舊換新進度', 'tradein-progress.html');
+    } catch {
+      if (controller.signal.aborted) return;
+      respond('這次未能讀回已核對的舊換新報表，目前無法確認筆數。');
+      actions.append(button('重新查詢',question));
+      link('查看舊換新進度','tradein-progress.html');
+    } finally {
+      if (activeRead === controller) activeRead = null;
+    }
+  }
   const cards = [...document.querySelectorAll('a.card[data-search]')];
   function ask(raw) {
     const q = normalize(raw);
     if (!q) { input.focus(); return; }
+    cancelRead();
+    const follow = expectTradeinSubject;
+    expectTradeinSubject = false;
     byId('nori-asked').textContent = raw.trim();
     input.value = '';
     if (/上傳|匯入/.test(q)) {
@@ -62,7 +95,8 @@
     } else if (/查價|報價|回收價|估價|折抵|值多少|專案價|回收.*多少錢/.test(q)) {
       destination('在「查價＆回收系統」選擇機型，可查手機專案價或舊機回收價。', '開啟查價＆回收系統', 'threec-query.html');
     } else if (/舊換新|以舊換新|回收/.test(q)) {
-      if (/進度|幾台|幾件|達成|目標|還差|排名|累計/.test(q)) destination('進入後選「店進度」或「個人進度」，可查看已完成與尚缺台數。', '查看舊換新進度', 'tradein-progress.html');
+      if (/排名|機型|明細|獎金|金額|機款/.test(q)) destination('進入後可查看機款、明細或排名。','查看舊換新進度','tradein-progress.html');
+      else if (!/^(?:舊換新|以舊換新|回收)$/.test(q)) void tradeinAnswer(raw);
       else showChoice('你想查舊機能折多少，還是看本月回收進度？', [['查回收價','舊機回收價'],['查進度','舊換新進度']]);
     } else if (/締結|來客|續約洞察|tier/.test(q)) {
       destination('主管唯讀看板可依授權範圍查看 AQ／RT 締結率。', '查看締結率', 'readonly-dashboard.html');
@@ -82,7 +116,9 @@
         names.add(card.href);
         return true;
       });
-      if (matches.length) {
+      if (!matches.length && follow && /^[\p{Script=Han}*]{1,12}$/u.test(q)) {
+        void tradeinAnswer(raw + '舊換新筆數');
+      } else if (matches.length) {
         respond('可以從這些入口查看。');
         matches.slice(0,4).forEach(card => link(card.querySelector('h2,h3').textContent, card.href));
       } else showChoice(/幾|差|多少|進度|目標/.test(q) ? '你想看哪一項進度？' : '還沒找到對應的入口。可以輸入工具名稱，或選一個常查項目。', [['OP 系列','OP 進度'],['舊換新','舊換新進度'],['A999','A999 進度'],['動店','動店任務']]);
@@ -123,6 +159,11 @@
 
   function openPanel(open, trigger) {
     if (open && trigger) opener = trigger;
+    if (!open) {
+      if (activeRead) respond('查詢已收合，可重新輸入問題。');
+      cancelRead();
+      expectTradeinSubject = false;
+    }
     panel.hidden = !open;
     resumeCat();
     toggle.setAttribute('aria-expanded', String(open));
@@ -147,6 +188,15 @@
     if (event.key === 'Escape' && !panel.hidden) openPanel(false);
   });
   byId('nori-form').addEventListener('submit', event => { event.preventDefault(); ask(input.value); });
+  function resetQuestion() {
+    cancelRead();
+    expectTradeinSubject = false;
+    byId('nori-asked').textContent = '';
+    input.value = '';
+    respond('');
+  }
+  window.addEventListener('pagehide', resetQuestion);
+  window.addEventListener('portal-before-logout', resetQuestion);
   root.hidden = false;
   function openLinkedQuestion() {
     if (location.hash === '#ask-nori') openPanel(true, headerLink || toggle);
