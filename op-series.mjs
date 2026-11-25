@@ -5,6 +5,24 @@ if (window.parent !== window && new URLSearchParams(location.search).get('view')
 }
 const $ = id => document.getElementById(id);
 const storageKey = 'north12b.op-series.v1';
+function requestedStore() {
+  if (window.parent === window || new URLSearchParams(location.search).get('view') !== 'battle') return null;
+  try {
+    const parentUrl = new URL(window.parent.location.href);
+    if (parentUrl.origin === location.origin && parentUrl.pathname.endsWith('/kpi-battle.html')) {
+      return parentUrl.searchParams.get('nori');
+    }
+  } catch { /* Embedding pages on another origin do not supply helper requests. */ }
+  return null;
+}
+const helperRequest = requestedStore();
+const helperProgress = $('nori-progress');
+function showHelperEmpty() {
+  if (!helperRequest) return;
+  helperProgress.hidden = false;
+  helperProgress.textContent = '海苔：這台裝置尚無可讀取的 OP 報表。請在下方匯入「OP 劇院遊戲機達成率」Excel 並確認更新。';
+}
+showHelperEmpty();
 const labels = ['系列','商品','資費','店點','同仁'];
 let report, pending, worker, revision = 0, dimension = '系列';
 const percent = value => value == null ? '—' : Math.round(value * 100) + '%';
@@ -55,6 +73,18 @@ function render() {
   const scope = current.name || '北一二B';
   $('exportReadonly').textContent = '一鍵匯出唯讀版（' + (code ? scope : '全區') + '）';
   $('period').textContent = '北一二B・' + report.date.slice(0,7) + '-01 至 ' + report.date + '・排除空機';
+  if (helperRequest) {
+    const today = new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Taipei'}).format(new Date());
+    const prevDay = new Date(today + 'T00:00:00Z');
+    prevDay.setUTCDate(prevDay.getUTCDate() - 1);
+    const period = report.date === prevDay.toISOString().slice(0,10) ? '前日累計' : '資料截止';
+    const result = current.target === 0 ? '未設月目標' : current.total >= current.target ? '已達標' : '還差 ' + (current.target - current.total) + ' 件';
+    const complete = [current.target, current.total].every(n => Number.isSafeInteger(n) && n >= 0)
+      && /^\d{4}-\d{2}-\d{2}$/.test(report.date) && report.date <= today;
+    helperProgress.textContent = !complete ? '海苔：報表日期或件數不完整，請重新匯入核對。' : code
+      ? '海苔：' + scope + ' OP 月目標 ' + current.target + ' 件，已完成 ' + current.total + ' 件，' + result + '。' + period + ' ' + report.date + '。'
+      : '海苔：請從「查看範圍」選擇門市，即可查看目標差額。報表截止 ' + report.date + '。';
+  }
   $('metrics').replaceChildren();
   for (const [key,value] of [['累計上線',current.total + ' 件'],['月目標',current.target + ' 件'],['進度達成率',percent(current.rate)],['月目標達成率',percent(current.target ? current.total/current.target : null)]]) {
     const tile = element('div');
@@ -115,7 +145,7 @@ $('exportReadonly').onclick=()=>{
   downloadReadonly('OP系列',scope,$('period').textContent,report.date,sections);
 };
 function show(value) {
-  const selected = $('store').value;
+  const selected = report ? $('store').value : value.stores.find(s => s.name === helperRequest)?.code;
   report = value;
   $('store').replaceChildren(new Option('北一二B（全區）',''));
   for (const s of report.stores) $('store').add(new Option(s.name,s.code));
@@ -175,5 +205,5 @@ window.addEventListener('storage', e => {
   if (e.key !== storageKey && e.key !== null) return;
   const latest = saved();
   if (latest) show(latest);
-  else { report = null; $('exportReadonly').hidden = true; $('dashboard').hidden = true; $('period').textContent = '北一二B・排除空機'; }
+  else { report = null; showHelperEmpty(); $('exportReadonly').hidden = true; $('dashboard').hidden = true; $('period').textContent = '北一二B・排除空機'; }
 });
