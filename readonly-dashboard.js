@@ -5,6 +5,11 @@
   let model=null,epoch=0,flight=null,client=null,controller=null,expires=0,expiryTimer,failed=false,suspended=false,loggedOut=false,acceptedIdentity=null;
   const exportButton=$('#store-export'),exportStatus=$('#export-status');
   let evidenceBusy=false;
+  const capacityHost=$('#capacity-panel');
+  const capacity=capacityHost && window.createCapacityPanel?.(capacityHost,()=>{
+    if(!retained()||model.stores.length!==C.STORES.length)throw Error('請重新核驗九店授權。');
+    return conversionData();
+  },()=>state.store);
   function viewStores(){return model?.stores||[];}
   function conversionData(){return model?.conversion;}
   function scopeControls(){const stores=viewStores();if(state.store!=='all'&&!stores.some(s=>s.id===state.store))state.store='all';$('#store').innerHTML='<option value="all">本次授權範圍全部門市</option>'+stores.map(s=>'<option value="'+s.id+'">'+safe(s.name)+'</option>').join('');$('#store').value=state.store;}
@@ -15,6 +20,7 @@
   function scope(){return viewStores().find(s=>s.id===state.store)?.name||'北一二B · 本次授權範圍';}
   function empty(message){$('#content').innerHTML='<div class="empty"><h2>'+safe(message)+'</h2><p>來源未就緒的資料不以零值或示意資料代替。</p></div>';}
   function clear(message='畫面已清除，請重新核驗登入。'){
+    capacity?.reset();if(capacityHost)capacityHost.hidden=true;
     evidenceBusy=false;$('#store-export-sources').hidden=true;$('#renewal-import-status').textContent='可補入本月完整原報，僅在本機彙總。';
     epoch++;controller?.abort();controller=null;client?.suspend();clearTimeout(expiryTimer);expires=0;flight=null;model=null;acceptedIdentity=null;
     $('#controls').hidden=true;$('#content').replaceChildren();$('#source-note').textContent='尚未取得本次授權資料。';$('#auth-message').textContent=message;
@@ -129,6 +135,8 @@
   }
   function render(){document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===state.tab)));if(!model||!retained())return;
     if(expires&&Date.now()>=expires){failed=true;clear('登入期限已到，請在營運中心重新完成業務登入。');return;}scopeControls();const dates=['conversion','traffic'].includes(state.tab);const current=conversionData();if(current){for(const id of ['start','end']){$('#'+id).min=current.period_start;$('#'+id).max=current.cutoff;}if(!state.start||state.start<current.period_start||state.end>current.cutoff){state.start=current.period_start;state.end=current.cutoff;}$('#start').value=state.start;$('#end').value=state.end;}document.querySelectorAll('[data-date-control]').forEach(e=>e.hidden=!dates);$('#daily').setAttribute('aria-pressed',String(state.mode==='daily'));$('#cumulative').setAttribute('aria-pressed',String(state.mode==='cumulative'));
+    if(capacityHost)capacityHost.hidden=state.tab!=='conversion'||viewStores().length!==C.STORES.length;
+    if(capacityHost && !capacityHost.hidden)capacity?.draw();
     if(state.tab==='kpi')kpi();else if(state.tab==='personal')personal();else if(state.tab==='awards')awards();else if(state.tab==='insights')insights();else traffic();
   }
   function accessFailure(error,stage){
