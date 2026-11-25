@@ -4,6 +4,8 @@
   if (!root) return;
   const byId = id => document.getElementById(id);
   const toggle = byId('nori-toggle');
+  const headerLink = byId('ask-nori');
+  let opener = toggle;
   const panel = byId('nori-panel');
   const input = byId('nori-question');
   const answer = byId('nori-answer');
@@ -86,18 +88,35 @@
       } else showChoice(/幾|差|多少|進度|目標/.test(q) ? '你想看哪一項進度？' : '還沒找到對應的入口。可以輸入工具名稱，或選一個常查項目。', [['OP 系列','OP 進度'],['舊換新','舊換新進度'],['A999','A999 進度'],['動店','動店任務']]);
     }
   }
-  function openPanel(open) {
+  function openPanel(open, trigger) {
+    if (open && trigger) opener = trigger;
     panel.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
+    headerLink?.setAttribute('aria-expanded', String(open));
     if (open) input.focus({preventScroll:true});
-    else toggle.focus({preventScroll:true});
+    else opener.focus({preventScroll:true});
   }
   for (const [label, question] of shortcuts) byId('nori-shortcuts').append(button(label, question));
-  toggle.addEventListener('click', () => openPanel(panel.hidden));
+  toggle.addEventListener('click', () => openPanel(panel.hidden, toggle));
+  if (headerLink) {
+    headerLink.href = '#ask-nori';
+    headerLink.setAttribute('aria-controls', panel.id);
+    headerLink.setAttribute('aria-expanded', 'false');
+    headerLink.addEventListener('click', event => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      openPanel(true, headerLink);
+    });
+  }
   byId('nori-close').addEventListener('click', () => openPanel(false));
   root.addEventListener('keydown', event => {
     if (event.key === 'Escape' && !panel.hidden) openPanel(false);
   });
   byId('nori-form').addEventListener('submit', event => { event.preventDefault(); ask(input.value); });
   root.hidden = false;
+  function openLinkedQuestion() {
+    if (location.hash === '#ask-nori') openPanel(true, headerLink || toggle);
+  }
+  window.addEventListener('hashchange', openLinkedQuestion);
+  openLinkedQuestion();
 })();
