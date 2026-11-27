@@ -12,7 +12,7 @@
 <section id="import-panel"><label class="primary file">選取本機原報<input id="files" type="file" accept=".xlsx,.xlsm" multiple></label>
 <button id="export" disabled>一鍵匯出三項唯讀HTML</button><button id="clear">清除本次資料</button>
 <a id="back" href="department-ops.html#conversion">返回部區管理</a>
-<details><summary>原報與期間</summary><p>可一次選取當月及上月原報。使用 AQ締結率、RT每日、RT締結率核對店日，樞紐核對上月同期。Tier 採 RT用戶進店行為_店、Tier觀察；未續約明細只保留方案彙總。若只有店月總計，可選取「部區月累計」工作表，欄名依序為資料起日、截止日、區別、店碼、店名、AQ上線數、AQ來客數、RT續約數、RT合格來客數。資料限本次開啟期間，可下載離線版留存。</p></details></section>
+<details><summary>原報與期間</summary><p>可一次選取當月及上月原報。使用 AQ締結率、RT每日、RT締結率核對店日，樞紐核對上月同期。Tier 採 RT用戶進店行為_店、Tier觀察；未續約明細只保留方案彙總。若只有店月總計，可選取「部區月累計」工作表，欄名依序為資料起日、截止日、區別、店碼、店名、AQ上線數、AQ來客數、RT續約數、RT合格來客數。<span id="retentionNote">資料限本次開啟期間，可下載離線版留存。</span></p></details></section>
 <p id="status" role="status">請選取本機 AQ／RT 原報以查看部與四區摘要。</p>
 <div id="view" hidden>
 <section class="filters" aria-label="分析篩選">
@@ -34,5 +34,6 @@
 <script src="readonly-dashboard-core.js"></script><script src="readonly-renewal-detail.js"></script>
 <script src="offline-html.js"></script><script src="north12-officer-core.js?v=20261125-1"></script>
 <script src="north12-office-source.js"></script><script src="north12-trends.js"></script><script src="north12-trend-report.js"></script>
-<script src="north12-trend-view.js"></script><script src="north12-officer-export-assets.js?v=20261125-2"></script><script src="north12-officer.js?v=20261125-2"></script>
+<script src="north12-trend-view.js"></script><script src="north12-officer-export-assets.js?v=20261127-session"></script>
+<script src="north12-officer-session.js?v=20261127-session"></script><script src="north12-officer.js?v=20261127-session"></script>
 </body></html>

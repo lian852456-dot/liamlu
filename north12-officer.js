@@ -13,6 +13,9 @@
     $('status').textContent='請選取本機 AQ／RT 原報，查看北一二B與各店表現。';
     $('export').textContent='匯出所選範圍 HTML';
   }
+  const importSession = battleRegion && !offline ? window.North12OfficerSession?.open() : null;
+  const initialStatus = $('status').textContent;
+  if (importSession) $('retentionNote').textContent='已核對資料會保留在本機瀏覽器，返回首頁後可在同一次戰情登入內繼續查看。';
   let history=new Map(),sessionBatch='',model=null,scope=T.ALL,generation=0,packet=null,compact=false;
   let options={ch:'rt',base:'office',kind:'level',period:'wow',heatMetric:'rate',tierSource:'store',threshold:30};
   const option=(v,label=v)=>'<option value="'+esc(v)+'">'+esc(label)+'</option>';
@@ -107,28 +110,70 @@
     if(!data.monthlyTotals)try{data.office=window.North12OfficeSource.read(w,XLSX,data);}catch(e){data.officeIssue=e.message;}
     return data;
   }
+  const isCurrent = token => token === generation && (!importSession || importSession.valid());
+  function resetImport(status) {
+    history=new Map();sessionBatch='';model=null;$('view').hidden=true;$('export').disabled=true;
+    for(const id of ['overview','summary','sourceBody','chart','comparison','tierBody','advice','legend','region','store','month'])$(id).replaceChildren();
+    document.body.classList.remove('import-error');$('status').textContent=status;
+  }
+  async function restoreImport() {
+    const token = ++generation;
+    $('files').disabled = true;
+    resetImport('正在還原本機締結率資料…');
+    try {
+      const saved = await importSession.read();
+      if (!isCurrent(token)) return;
+      if (saved?.history.size) {
+        history=saved.history;sessionBatch=saved.batch;populate();
+      } else {
+        $('status').textContent=initialStatus;
+      }
+    } catch {
+      if (isCurrent(token)) resetImport('無法還原本機締結率資料，請重新選取原報。');
+    } finally {
+      if (token === generation) $('files').disabled = false;
+    }
+  }
   if($('files'))$('files').onchange=async event=>{
     const files=Array.from(event.target.files);event.target.value='';if(!files.length)return;
     const token=++generation,loaded=[];let filename='';
     $('status').textContent='正在本機核對 '+files.length+' 份原報…';
     try{
-      for(const file of files){filename=file.name;loaded.push(await parseFile(file));if(token!==generation)return;}
+      for(const file of files){filename=file.name;loaded.push(await parseFile(file));if(!isCurrent(token))return;}
       if(battleRegion&&!loaded.some(d=>d.stores.some(s=>s.region===battleRegion)))throw Error('選取的來源缺少北一二B門市');
       const next=T.apply(history,loaded);
       const ids=T.unique([...next.values()].map(p=>p.period_start+'|'+p.region+'|'+Object.values(p.tierSnapshots||{}).map(s=>s.sha256).sort().join(','))).sort().join('\n');
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ids));
-      if(token!==generation)return;
-      sessionBatch=Array.from(new Uint8Array(digest).slice(0,6),v=>v.toString(16).padStart(2,'0')).join('');
-      history=next;document.body.classList.remove('import-error');populate();
+      if(!isCurrent(token))return;
+      const batch=Array.from(new Uint8Array(digest).slice(0,6),v=>v.toString(16).padStart(2,'0')).join('');
+      let retained = true;
+      if (importSession) {
+        $('files').disabled = true;
+        try {
+          await importSession.save(next, batch, () => isCurrent(token));
+        } catch {
+          retained = false;
+        } finally {
+          if (token === generation) $('files').disabled = false;
+        }
+      }
+      if(!isCurrent(token))return;
+      sessionBatch=batch;history=next;document.body.classList.remove('import-error');populate();
+      if (!retained) $('status').textContent += ' ｜ 瀏覽器無法保留本次匯入，離頁前可先匯出 HTML。';
     }catch(error){
-      if(token!==generation)return;document.body.classList.add('import-error');
+      if(!isCurrent(token))return;document.body.classList.add('import-error');
       $('status').textContent=filename+' 匯入失敗：'+error.message+'。'+(model?'沿用批次 '+sessionBatch+'，目前檢視截至 '+model.end:'目前尚無有效資料。');
     }
   };
-  if($('clear'))$('clear').onclick=()=>{
-    generation++;history=new Map();model=null;$('view').hidden=true;$('export').disabled=true;
-    for(const id of ['overview','summary','sourceBody','chart','comparison','tierBody','advice','legend','region','store','month'])$(id).replaceChildren();
-    document.body.classList.remove('import-error');$('status').textContent='本次來源與分析資料已清除。';
+  if($('clear'))$('clear').onclick=async()=>{
+    const token = ++generation;
+    resetImport('本次來源與分析資料已清除。');
+    $('files').disabled = false;
+    try {
+      await importSession?.clear();
+    } catch {
+      if (isCurrent(token)) $('status').textContent='已清除畫面，但無法清除瀏覽器內的資料。';
+    }
   };
   if($('export'))$('export').onclick=()=>{
     if(!model)return;
@@ -141,6 +186,16 @@
   if(offline)loadPacket(JSON.parse(offline.textContent));
   const legacy=$('officer-data');
   if(legacy){const d=C.validate(JSON.parse(legacy.textContent));history=T.apply(new Map(),[d]);sessionBatch=d.sha256.slice(0,12);populate();}
+  if (importSession) {
+    window.addEventListener('pagehide', event => {
+      generation++;
+      if (event.persisted) resetImport(initialStatus);
+    });
+    window.addEventListener('pageshow', event => {
+      if (event.persisted) void restoreImport();
+    });
+    void restoreImport();
+  }
   if(window.parent!==window && (location.hash==='#summary'||battleRegion)){
     compact=!battleRegion;document.body.classList.add('embedded');document.body.classList.toggle('compact',compact);
     window.North12ReportDisplay=expanded=>{compact=!expanded;document.body.classList.toggle('compact',compact);};

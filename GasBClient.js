@@ -5,7 +5,12 @@ function createDashboardBClient(ownerExecUrl, options={}) {
   const storage=options.storage,storageKey='north12b_password_session_v1';
   const phoneStorage=options.phoneStorage,phoneKey='north12b_owner_phone_v1',phoneTtl=90*24*60*60*1000;
   let session=null,generation=0,expiresAt=0,lastDeviceId='',lastPhoneToken='';
-  function removeSaved(){try{storage?.removeItem(storageKey);}catch{}}
+  function removeSaved(){
+    try {
+      storage?.removeItem(storageKey);
+      storage?.removeItem('north12b.conversion-report.v1');
+    } catch {}
+  }
   function sessionState(name){try{options.onSessionState?.(name);}catch{}}
   function rejectLogin(category){try{options.onAuthRejection?.(category);}catch{}throw new Error('B_AUTH_DENIED');}
   const loginTtl=30*60*1000, battleTtl=24*60*60*1000;

@@ -105,6 +105,7 @@
     }
     // Clear protected display caches across every site page. Draft files, prefs and device IDs remain.
     remove('sessionStorage', 'north12b_password_data_v1');
+    remove('sessionStorage', 'north12b.conversion-report.v1');
     try {
       for (let i = scope.sessionStorage.length - 1; i >= 0; i -= 1) {
         const key = scope.sessionStorage.key(i);

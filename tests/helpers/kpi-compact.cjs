@@ -281,10 +281,11 @@ test('focus tasks use the verified session, distinguish missing staff and filter
  expect(f.errors).toEqual([]);
 });
 
-test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清除',async({page},info)=>{
+test('KPI 締結率報表離頁後還原，保留有效批次及匯出範圍',async({page})=>{
  await page.route('**/assets/vendor/xlsx.full.min.js',route=>route.fulfill({
   contentType:'text/javascript',body:fs.readFileSync(path.join(root,'assets/vendor/xlsx.full.min.js'))
  }));
+ await page.clock.install();
  const {calls}=await start(page,{ttl:1800000,battleView:true});
  const entry=page.getByRole('button',{name:'締結率',exact:true});
  await expect(page.locator('[data-b-module="kpi"] + button')).toHaveText('締結率');
@@ -293,15 +294,19 @@ test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清�
  const report=page.frameLocator('#panel-conversion iframe');
  await expect(page).toHaveURL(/#conversion$/);
  await expect(report.locator('#back')).toBeHidden();
+ await expect(report.locator('#status')).toContainText('查看北一二B與各店表現');
  const XLSX=require('../../assets/vendor/xlsx.full.min.js'),book=XLSX.utils.book_new();
  const rows=[['資料起日','截止日','區別','店碼','店名','AQ上線數','AQ來客數','RT續約數','RT合格來客數'],
   ['2026-11-01','2026-11-03','北一二B','DNB10001','示範店',54,120,4,10],
   ['2026-11-01','2026-11-03','北一二A','DNB10002','跨區驗收店',5,5,5,5]];
  XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(rows),'部區月累計');
- const file=info.outputPath('sample.xlsx');
- fs.mkdirSync(path.dirname(file),{recursive:true});
- fs.writeFileSync(file,Buffer.from(XLSX.write(book,{type:'array',bookType:'xlsx'})));
- await report.locator('#files').setInputFiles(file);
+ const previous = {
+  name:'previous.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  buffer:require('./readonly-conversion-workbook.cjs').workbook({month:'2026-10'})
+ };
+ const file={name:'sample.xlsx',mimeType:previous.mimeType,buffer:Buffer.from(XLSX.write(book,{type:'array',bookType:'xlsx'}))};
+ await expect(report.locator('#files')).toBeEnabled();
+ await report.locator('#files').setInputFiles([file,previous]);
  await expect(report.locator('#status')).toContainText('sample.xlsx');
  await expect(report.locator('#full')).toBeVisible();
  await expect(report.locator('#region option')).toHaveText(['北一二B']);
@@ -316,7 +321,84 @@ test('KPI 締結率分頁共用完整報表，切換後保留匯入，登出清�
  await entry.click();
  await expect(report.locator('#overview')).toContainText('45.00%');
  expect(calls.length).toBe(requestCount);
- await page.locator('.b-more summary').click();
- await page.locator('[data-b-logout]').click();
+
+ const batch = await report.locator('#status').textContent();
+ await page.getByRole('link',{name:'返回智慧營運中心'}).click();
+ await expect(page).toHaveURL(/\/home\.html$/);
+ // The ordinary portal login has expired. The battle lease remains valid.
+ await page.clock.fastForward(23*60*60*1000);
+ await page.locator('.quick-card[href="kpi-battle.html"]').click();
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+ await entry.click();
+ await expect(report.locator('#status')).toHaveText(batch);
+ await expect(report.locator('#overview')).toContainText('45.00%');
+ await expect(report.locator('#month option')).toHaveText(['2026-11','2026-10']);
+ expect(calls.filter(action=>action==='employee_login')).toHaveLength(1);
+ expect(calls.filter(action=>action==='employee_dashboard_read')).toHaveLength(1);
+
+ const invalid={name:'invalid.xlsx',mimeType:previous.mimeType,buffer:Buffer.from('invalid')};
+ await report.locator('#files').setInputFiles([previous,invalid]);
+ await expect(report.locator('#status')).toContainText('匯入失敗');
+ await expect(report.locator('#overview')).toContainText('45.00%');
+ await page.reload();
+ await expect(report.locator('#status')).toHaveText(batch);
+
+ rows[1][5]=60;
+ book.Sheets['部區月累計']=XLSX.utils.aoa_to_sheet(rows);
+ const corrected={name:'corrected.xlsx',mimeType:previous.mimeType,buffer:Buffer.from(XLSX.write(book,{type:'array',bookType:'xlsx'}))};
+ await report.locator('#files').setInputFiles(corrected);
+ await expect(report.locator('#status')).toContainText('corrected.xlsx');
+ await page.reload();
+ await expect(report.locator('#status')).toContainText('corrected.xlsx');
+ await expect(report.locator('#overview')).toContainText('50.00%');
+ await expect(report.locator('#month option')).toHaveText(['2026-11','2026-10']);
+
+ await report.locator('#clear').click();
+ await expect(report.locator('#view')).toBeHidden();
+ await page.getByRole('link',{name:'返回智慧營運中心'}).click();
+ await page.locator('.quick-card[href="kpi-battle.html"]').click();
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+ await entry.click();
+ await expect(report.locator('#status')).toContainText('請選取本機');
+ await expect(report.locator('#export')).toBeDisabled();
+});
+
+for(const end of ['戰情到期','首頁登出'])test('締結率報表在'+end+'後不會跨次登入還原',async({page})=>{
+ await page.route('**/assets/vendor/xlsx.full.min.js',route=>route.fulfill({
+  contentType:'text/javascript',body:fs.readFileSync(path.join(root,'assets/vendor/xlsx.full.min.js'))
+ }));
+ await page.clock.install();
+ await start(page,{ttl:1800000,battleView:true});
+ const access=page.locator('#dashboard-b-access'),entry=page.getByRole('button',{name:'締結率',exact:true});
+ const report=page.frameLocator('#panel-conversion iframe');
+ await entry.click();
+ await expect(report.locator('#status')).toContainText('查看北一二B與各店表現');
+ await expect(report.locator('#files')).toBeEnabled();
+ const buffer=require('./readonly-conversion-workbook.cjs').workbook({month:'2026-11'});
+ await report.locator('#files').setInputFiles({name:'verified.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
+ await expect(report.locator('#status')).toContainText('verified.xlsx');
+ await expect(report.locator('#view')).toBeVisible();
+ if(end==='戰情到期'){
+  await page.clock.fastForward(24*60*60*1000+5000);
+  await expect(access).toHaveAttribute('data-state','locked');
+  await expect(page.locator('#panel-conversion iframe')).toHaveCount(0);
+ }else{
+  await page.getByRole('link',{name:'返回智慧營運中心'}).click();
+  await expect(page).toHaveURL(/\/home\.html$/);
+  page.once('dialog', dialog=>dialog.accept());
+  const reloaded=page.waitForEvent('load');
+  await page.getByRole('button',{name:'登出營運中心網頁'}).click();
+  await reloaded;
+ }
+ expect(await page.evaluate(()=>sessionStorage.getItem('north12b.conversion-report.v1'))).toBeNull();
+ await page.goto(origin+'/kpi-battle.html#conversion');
+ await expect(access).toHaveAttribute('data-state','locked');
  await expect(page.locator('#panel-conversion iframe')).toHaveCount(0);
+ if(end==='首頁登出'){
+  await page.locator('[data-b-employee]').fill('SYNTHETIC');
+  await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
+  await page.locator('[data-b-submit]').click();
+  await expect(access).toHaveAttribute('data-state','active');
+  await expect(report.locator('#status')).toContainText('請選取本機');
+ }
 });
