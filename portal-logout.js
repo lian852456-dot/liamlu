@@ -75,9 +75,12 @@
   scope.fetch = async function (...args) {
     const expected = epoch;
     assertActive(expected);
-    let action = '';
-    try { action = JSON.parse(args[1]?.body || '{}').action || ''; } catch {}
-    const mutation = /(?:write|publish|restore|commit|upload)$/.test(action) && action !== 'ptlogout';
+    const body = args[1]?.body;
+    // Most uploads put the action first. Recognize writes without decoding the entire report twice.
+    let mutation = typeof body === 'string' && /^\{"action":"[a-z_]*(?:write|publish|restore|commit|upload)"[,}]/.test(body);
+    if (!mutation && body) {
+      try { mutation = /(?:write|publish|restore|commit|upload)$/.test(JSON.parse(body).action); } catch {}
+    }
     if (mutation) activeWrites += 1;
     let finished = false;
     const finish = () => { if (!finished && mutation) { activeWrites -= 1; finished = true; } };
@@ -258,9 +261,10 @@
       if (sessionHost) sessionHost.append(control); else document.body.prepend(control);
       const update = () => { if (!locked) {
         const currentNote = read('sessionStorage',NOTE_KEY);
-        copy.textContent = currentNote || SCOPE_NOTE;
-        button.hidden = !hasIdentity() || Boolean(ownControls);
-        const visible = Boolean(((!ownControls || sessionHost) && hasIdentity()) || currentNote);
+        if (copy.textContent !== (currentNote || SCOPE_NOTE)) copy.textContent = currentNote || SCOPE_NOTE;
+        const signedIn = hasIdentity();
+        button.hidden = !signedIn || Boolean(ownControls);
+        const visible = Boolean(((!ownControls || sessionHost) && signedIn) || currentNote);
         control.hidden = !visible; control.style.display = visible ? 'flex' : 'none';
       } };
       update(); scope.setInterval(update,1000);

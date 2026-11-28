@@ -189,7 +189,9 @@
     const status=$('#renewal-import-status'),candidate={...current.renewalEvidence},E=window.StoreRenewalEvidence;
     status.textContent='正在核對門市、來源日期與續約件數…';
     try{
+      const XLSX=await window.loadWorkbookReader();
       for(const file of files){
+        if(ticket!==epoch||!retained())return;
         const bytes=await file.arrayBuffer();
         if(ticket!==epoch||!retained())return;
         const names=XLSX.read(bytes,{type:'array',bookSheets:true}).SheetNames.filter(n=>E.sheets.includes(n.normalize('NFKC').replace(/\s+/g,'')));

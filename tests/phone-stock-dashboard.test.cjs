@@ -145,7 +145,9 @@ test('庫存檔本機解析，只有明確按同步鍵才發布庫存快照', ()
   const root = path.resolve(__dirname, '..');
   const page = fs.readFileSync(path.join(root, 'phone-stock-dashboard.html'), 'utf8');
   const controller = fs.readFileSync(path.join(root, 'phone-stock-dashboard.js'), 'utf8');
-  assert.match(page, /assets\/vendor\/xlsx\.full\.min\.js/);
+  assert.match(page, /src="workbook-reader\.js/);
+  assert.doesNotMatch(page, /<script[^>]+src="assets\/vendor\/xlsx/);
+  assert.match(fs.readFileSync(path.join(root, 'workbook-reader.js'), 'utf8'), /assets\/vendor\/xlsx\.full\.min\.js/);
   assert.match(page, /id="salesFile" type="file"/);
   assert.match(page, /id="stockFile" type="file"/);
   assert.match(page, /id="modelQuery" type="search"/);

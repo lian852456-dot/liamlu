@@ -184,11 +184,13 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   const page = fs.readFileSync(path.join(root, 'daily-log-dashboard.html'), 'utf8');
   const controller = fs.readFileSync(path.join(root, 'daily-log-dashboard.js'), 'utf8');
   const home = fs.readFileSync(path.join(root, 'home.html'), 'utf8');
-  assert.match(page, /assets\/vendor\/xlsx\.full\.min\.js/);
+  assert.match(page, /src="workbook-reader\.js/);
+  assert.doesNotMatch(page, /<script[^>]+src="assets\/vendor\/xlsx/);
+  assert.match(fs.readFileSync(path.join(root, 'workbook-reader.js'), 'utf8'), /assets\/vendor\/xlsx\.full\.min\.js/);
   assert.doesNotMatch(page, /https?:\/\//);
   assert.match(page, /<input class="file-input" id="fileInput" type="file" accept="\.xlsx,\.xls,\.csv,\.tsv">/);
   assert.doesNotMatch(page, /id="chooseFile"/);
-  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20261124-board-1"><\/script>/);
+  assert.match(page, /<script src="daily-log-dashboard\.js\?v=20261128-reader"><\/script>/);
   assert.doesNotMatch(page, /type="module" src="daily-log-dashboard\.js"/);
   assert.match(page, /候選版 · 本機預覽/);
   assert.match(page, /尚未寫入雲端/);
@@ -200,7 +202,7 @@ test('頁面契約使用本機 SheetJS、標示候選版並接入同仁大廳', 
   assert.match(page, /id="calendarFileInput" type="file"/);
   assert.match(page, /店務行事曆 Excel/);
   assert.match(controller, /Core\.chooseBestCalendarSheet/);
-  assert.match(page, /daily-log-dashboard\.js\?v=20261124-board-1/);
+  assert.match(page, /daily-log-dashboard\.js\?v=20261128-reader/);
   assert.match(home, /href="daily-log-dashboard\.html"/);
   assert.match(home, />每日日誌檢查</);
   assert.match(page, /daily-log-dashboard\.css\?v=20261124-board-1/);

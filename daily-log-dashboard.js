@@ -117,7 +117,8 @@ async function parseLogFile(file) {
   $('importPreview').hidden = true;
   setMessage('正在本機解析報表…');
   try {
-    const workbook = window.XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true });
+    const [reader, bytes] = await Promise.all([window.loadWorkbookReader(), file.arrayBuffer()]);
+    const workbook = reader.read(bytes, { type:'array', cellDates:true });
     const selected = Core.chooseBestSheet(sheetRows(workbook), { asOfDate, date1904:Boolean(workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904) });
     if (!selected) throw new Error('找不到包含「店點、檢查項目、處理狀態、細項名稱」的工作表。');
     if (selected.parsed.errors.length) throw new Error(selected.parsed.errors.slice(0, 4).join('\n'));
@@ -144,7 +145,8 @@ async function parseCalendarFile(file) {
   $('applyPreview').disabled = true;
   setCalendarMessage('正在本機解析店務行事曆…');
   try {
-    const workbook = window.XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true });
+    const [reader, bytes] = await Promise.all([window.loadWorkbookReader(), file.arrayBuffer()]);
+    const workbook = reader.read(bytes, { type:'array', cellDates:true });
     const selected = Core.chooseBestCalendarSheet(sheetRows(workbook), { date1904:Boolean(workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904) });
     if (!selected) throw new Error('找不到包含「檢查日期、店點名稱（或營業點代碼）、處理狀態」的工作表。');
     if (selected.parsed.errors.length) throw new Error(selected.parsed.errors.slice(0, 4).join('\n'));

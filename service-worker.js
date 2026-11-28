@@ -29,6 +29,7 @@ const SHELL = [
   './award-model-catalog.js',
   './phone-stock-app.js',
   './phone-stock-core.js',
+  './workbook-reader.js',
   './assets/vendor/xlsx.full.min.js',
   './app-data-contract.js',
   './app-preview-data.js',
@@ -56,7 +57,7 @@ self.addEventListener('activate', event => {
 });
 
 function networkFirstHtml(request) {
-  return fetch(request, { cache:'no-store' }).then(response => {
+  return fetch(request, { cache:'no-cache' }).then(response => {
     if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     return response;
   }).catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')));
@@ -67,7 +68,7 @@ function networkFirstHtml(request) {
 // the same versioned shell file when the device is offline. This cache never
 // contains private API responses or credentials.
 function networkFirstShellAsset(request) {
-  return fetch(request, { cache:'no-store' }).then(response => {
+  return fetch(request, { cache:'no-cache' }).then(response => {
     if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     return response;
   }).catch(() => caches.match(request, { ignoreSearch:true }));

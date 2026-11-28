@@ -26,7 +26,7 @@
   let focused = false;
   let controllers = new Set();
 
-  function icons() { if (scope.lucide) scope.lucide.createIcons(); }
+  function icons(root = document) { scope.lucide?.createIcons({root}); }
   function storage(area, key) {
     try { return scope[area].getItem(key) || ''; } catch { return ''; }
   }
@@ -106,7 +106,7 @@
     $('reminder-pause').setAttribute('aria-label', userPaused ? '開始自動輪播' : '暫停自動輪播');
     $('reminder-pause').setAttribute('aria-pressed', String(userPaused));
     $('reminder-pause').innerHTML = `<i data-lucide="${userPaused ? 'play' : 'pause'}" aria-hidden="true"></i>`;
-    icons();
+    icons($('reminder-pause'));
     scheduleRotation();
   }
 
@@ -269,7 +269,9 @@
     }, { passive: true });
   }
 
-  icons(); setupSearch(); setupNavigation();
+  if (scope.lucide) icons();
+  else $('home-icons').addEventListener('load', () => icons(), {once:true});
+  setupSearch(); setupNavigation();
   if (!Model) return;
   $('reminder-prev').addEventListener('click', () => showNext(-1));
   $('reminder-next').addEventListener('click', () => showNext(1));

@@ -7,7 +7,19 @@ const DATA_CACHE_KEY='north12b_password_data_v1';
 let host,client,active=false,confirmed=false,epoch=0,expiresAt=0,expiryTimer,dataCacheTimer,ready=false,loading=false,guarded=false,checking=null,rechecking=false,panel,acceptedProof=null,lastLoadedAt=0;
 let interimInsuranceCheck;
 const pendingHost=scope.DashboardBHost;
-let legacyObserver;
+let legacyObserver, preparedStatus;
+function serviceStatus() {
+ // This anonymous check can run while someone types, independently of revoking an old login.
+ const probe=createDashboardBClient(OWNER,{onRequest:row=>timing('request:'+row.action,row.ms,row.outcome),
+  onServerTiming:row=>timing('server:'+row.action+':'+row.name,row.ms)});
+ return probe.status();
+}
+function prepareStatus(){
+ if(loading || preparedStatus || scope.PortalLogout?.isLocked())return;
+ const promise=serviceStatus();
+ promise.catch(()=>{}); // The form may be abandoned before submit.
+ preparedStatus={promise,at:performance.now()};
+}
 // Opt-in, bounded timing diagnostics. Only fixed operation labels, durations
 // and counts are kept; never record a request body, URL, identity or response.
 const timingKey='north12b_loading_timings_v1',timingEnabledKey='north12b_loading_timings_enabled';
@@ -110,7 +122,7 @@ function saveDataCache(privateResult,kpiResult){
  }catch{clearDataCache();}
 }
 function wipe(note='請重新輸入員編與指定密碼。',clearTransport=true){
- epoch++;active=false;confirmed=false;loading=false;expiresAt=0;acceptedProof=null;lastLoadedAt=0;scope.clearTimeout(expiryTimer);clearDataCache();if(clearTransport)client?.clear();checking=null;host?.clear(note);state('locked');message(note);
+ preparedStatus=null;epoch++;active=false;confirmed=false;loading=false;expiresAt=0;acceptedProof=null;lastLoadedAt=0;scope.clearTimeout(expiryTimer);clearDataCache();if(clearTransport)client?.clear();checking=null;host?.clear(note);state('locked');message(note);
  if(panel)panel.querySelector('[data-b-password]').value='';
 }
 function device(){let value=scope.localStorage.getItem(DEVICE_KEY);if(value)return value;
@@ -244,13 +256,21 @@ async function login(event){event.preventDefault();const employee=panel.querySel
  const started=performance.now();
  let password=panel.querySelector('[data-b-password]').value;panel.querySelector('[data-b-password]').value='';
  // Existing grants are ended before replacement; late old responses cannot repaint a new context.
+ const prepared=preparedStatus;
  const previous=client.logout();wipe(undefined,false);checking=null;const expected=epoch;loading=true;state('loading');message('正在驗證指定密碼與這台裝置…');
  const submit=panel.querySelector('[data-b-submit]');submit.disabled=true;
- try{await previous;const status=await client.status();if(expected!==epoch)return;
+ try{
+  const probe=prepared && performance.now()-prepared.at<15000?prepared.promise:serviceStatus();
+  // Finish revocation even if the anonymous probe fails first.
+  probe.catch(()=>{});
+  await previous;
+  const status=await probe;if(expected!==epoch)return;
   if(!status.enabled || !status.passwordAvailable)throw Error('B_DISABLED');
   const lease=await phase('login',()=>client.login(employee,device(),password));password='';if(expected!==epoch)return;
   active=true;expiresAt=lease.expiresAt;scheduleExpiry();
-  const ok=await refresh(false,true);if(!ok)return;recordReady(started,expected);scope.PortalLogout?.notifyLogin();
+  // The ordinary home only displays links. The validated login reply already supplies its lease.
+  const requireRead=!host.sessionOnly || host.ownerPhone || host.refreshOnResume;
+  const ok=await refresh(false,Boolean(requireRead));if(!ok)return;recordReady(started,expected);scope.PortalLogout?.notifyLogin();
   host.onPasswordLogin?.();
   if(host.ownerPhone && host.phoneEligible){try{await client.enrollPhone();state('active');message('已綁定這支手機，下次開啟 App 不用再輸入帳密。');}catch{message('本次已登入，但手機綁定未完成；可登出後重試，或請管理者撤銷舊手機。');}}
  }catch(error){if(expected===epoch)wipe(error.message==='B_DISABLED'?'指定密碼通道尚未開放，請使用原員編通道。':accessFailureMessage(error));}
@@ -317,7 +337,7 @@ function mount(){if(!host || panel || !DASHBOARD_B_CLIENT_ENABLED_)return;
  @media(max-width:760px){#dashboard-b-access{width:calc(100% - 40px)}}
  @media(max-width:600px){#dashboard-b-access{margin-bottom:12px;padding:12px 0 14px}#dashboard-b-access form{grid-template-columns:1fr;gap:12px}#dashboard-b-access [data-b-submit]{width:100%}#dashboard-b-access .b-toolbar{align-items:stretch;gap:12px}#dashboard-b-access nav{width:100%}#dashboard-b-access nav button{flex:1;padding:8px 10px}}
  @media(max-width:600px){#dashboard-b-access .b-options{border-top:1px solid #edf0f4}#dashboard-b-access .b-options>summary{display:list-item;margin-left:18px}#dashboard-b-access .b-options .b-toolbar{border-top:0;padding-top:4px}#dashboard-b-access.b-compact-mobile input{height:auto;line-height:1.4}#dashboard-b-access.b-compact-mobile button{white-space:normal}#dashboard-b-access.b-compact-mobile nav button{flex:1 1 8em}#dashboard-b-access.b-compact-mobile [data-b-submit]{height:auto}}
- `;document.head.append(style);setAccessMode('password');const mountPoint=host.mountSelector&&document.querySelector(host.mountSelector);if(mountPoint)mountPoint.prepend(panel);else{const header=document.querySelector('header');if(header)header.insertAdjacentElement('afterend',panel);else document.body.prepend(panel);}if(!legacyObserver){legacyObserver=new MutationObserver(markLegacyRoots);legacyObserver.observe(document.body,{childList:true,subtree:true});}panel.querySelector('form').addEventListener('submit',login);if(host.ownerPhone){panel.querySelector('[data-b-submit]').textContent='首次驗證並綁定這支手機';state('locked');message('只需首次驗證；綁定後平常開啟 App 免輸入帳密。登出會取消自動登入。');}
+ `;document.head.append(style);setAccessMode('password');const mountPoint=host.mountSelector&&document.querySelector(host.mountSelector);if(mountPoint)mountPoint.prepend(panel);else{const header=document.querySelector('header');if(header)header.insertAdjacentElement('afterend',panel);else document.body.prepend(panel);}if(!legacyObserver){legacyObserver=new MutationObserver(markLegacyRoots);legacyObserver.observe(document.body,{childList:true,subtree:true});}panel.querySelector('form').addEventListener('input',prepareStatus);panel.querySelector('form').addEventListener('submit',login);if(host.ownerPhone){panel.querySelector('[data-b-submit]').textContent='首次驗證並綁定這支手機';state('locked');message('只需首次驗證；綁定後平常開啟 App 免輸入帳密。登出會取消自動登入。');}
  panel.classList.toggle('b-compact-mobile',host.compactMobileLogin===true);
  if(host.compactBattle){
   const account=panel.querySelector('.b-account'),more=document.createElement('details'),summary=document.createElement('summary'),content=document.createElement('div'),lease=document.createElement('span');
