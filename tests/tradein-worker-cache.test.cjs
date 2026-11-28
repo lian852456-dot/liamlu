@@ -10,7 +10,9 @@ function worker({offline=false,asset='tradein-performance-core.js'}={}){
  vm.runInContext(fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),context);
  return {handlers,puts,matches,fetches,url};
 }
-async function get(runtime,url=runtime.url){let response;runtime.handlers.fetch({request:{url,method:'GET',mode:'cors'},respondWith:value=>response=value});return await response;}
+async function get(runtime,url=runtime.url){let response;const tasks=[];
+ runtime.handlers.fetch({request:{url,method:'GET',mode:'cors'},respondWith:value=>response=value,waitUntil:p=>tasks.push(p)});
+ const delivery=await response;await Promise.all(tasks);return delivery;}
 test('online trade-in assets use deployed code even when the exact URL has an old cache entry',async()=>{
  const r=worker();assert.equal(await (await get(r)).text(),'NEW_PARSER');assert.equal(r.fetches[0].options.cache,'no-store');assert.equal(r.matches.length,0);assert.equal(r.puts.length,1);
 });

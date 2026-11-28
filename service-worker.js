@@ -79,12 +79,10 @@ function networkFirstShellAsset(event) {
   return fetch(request, { cache:'no-cache' }).then(response => storePublicResponse(event, response)).catch(() => caches.match(request, { ignoreSearch:true }));
 }
 
-function networkFirstTradeinAsset(request) {
+function networkFirstTradeinAsset(event) {
+  const request = event.request;
   if (new URL(request.url).searchParams.has('refresh')) return fetch(request, { cache:'no-store' });
-  return fetch(request, { cache:'no-store' }).then(response => {
-    if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-    return response;
-  }).catch(() => caches.match(request));
+  return fetch(request, { cache:'no-store' }).then(response => storePublicResponse(event, response)).catch(() => caches.match(request));
 }
 
 function networkFirstKpiController(request) {
@@ -114,13 +112,13 @@ self.addEventListener('fetch', event => {
   // Trade-in uploads must use the deployed parser and upload controller while
   // online. Only the exact requested version may be used as an offline fallback.
   if (relativePath.startsWith('tradein-') && /\.(?:js|mjs|css)$/.test(relativePath)) {
-    event.respondWith(networkFirstTradeinAsset(event.request));
+    event.respondWith(networkFirstTradeinAsset(event));
     return;
   }
   // Query UI assets must use the deployed version while online. An offline
   // fallback is permitted only for the exact requested asset version.
   if (/^(?:threec-|price-model-view|quote-reference-|query-workspace|query-readability|query-route-update|promotion-catalog)/.test(relativePath) && /\.(?:js|mjs|css)$/.test(relativePath)) {
-    event.respondWith(networkFirstTradeinAsset(event.request));
+    event.respondWith(networkFirstTradeinAsset(event));
     return;
   }
   if (SHELL_PATHS.has(relativePath)) {
