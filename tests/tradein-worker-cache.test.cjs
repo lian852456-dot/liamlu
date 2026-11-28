@@ -10,7 +10,9 @@ function worker({offline=false,asset='tradein-performance-core.js'}={}){
  vm.runInContext(fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),context);
  return {handlers,puts,matches,fetches,url};
 }
-async function get(runtime,url=runtime.url){let response;runtime.handlers.fetch({request:{url,method:'GET',mode:'cors'},respondWith:value=>response=value});return await response;}
+async function get(runtime,url=runtime.url){let response;const tasks=[];
+ runtime.handlers.fetch({request:{url,method:'GET',mode:'cors'},respondWith:value=>response=value,waitUntil:p=>tasks.push(p)});
+ const delivery=await response;await Promise.all(tasks);return delivery;}
 test('online trade-in assets use deployed code even when the exact URL has an old cache entry',async()=>{
  const r=worker();assert.equal(await (await get(r)).text(),'NEW_PARSER');assert.equal(r.fetches[0].options.cache,'no-store');assert.equal(r.matches.length,0);assert.equal(r.puts.length,1);
 });
@@ -28,5 +30,25 @@ test('query interface assets prefer deployed code and never fall back across ver
  for(const asset of ['threec-query-ui.js','price-model-view.js','quote-reference-ui.js','query-workspace.js','query-readability.css','query-route-update.js','promotion-catalog-ui.js','tradein-official-workspace.js']){
   const live=worker({asset});assert.equal(await(await get(live)).text(),'NEW_PARSER');assert.equal(live.fetches[0].options.cache,'no-store');assert.equal(live.matches.length,0);
   const offline=worker({asset,offline:true});assert.equal(await(await get(offline)).text(),'OLD_PARSER');assert.equal(await get(offline,offline.url.replace('v=old','v=new')),undefined);assert.equal(offline.matches.every(m=>m.options===undefined),true);
+ }
+});
+
+test('entry pages and shared assets revalidate online and save a readable offline copy', async () => {
+ for (const asset of ['daily-log-dashboard.html','dashboard-b-shell.js?v=current']) {
+  const hooks = {}, tasks = [];
+  const request = {url:'https://example.test/liamlu/'+asset, method:'GET', mode:'cors'};
+  let releaseCache, saved, delivery;
+  const cacheReady = new Promise(resolve => { releaseCache = resolve; });
+  const context = vm.createContext({
+   URL, self:{location:{origin:'https://example.test'},registration:{scope:'https://example.test/liamlu/'},addEventListener:(name,fn)=>hooks[name]=fn},
+   fetch:async (_,options)=>{ assert.equal(options.cache,'no-cache'); return new Response('public asset'); },
+   caches:{open:()=>cacheReady,match:async()=>undefined}
+  });
+  vm.runInContext(fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),context);
+  hooks.fetch({request,respondWith:p=>{delivery=p;},waitUntil:p=>tasks.push(p)});
+  assert.equal(await (await delivery).text(),'public asset');
+  releaseCache({put:async (key,response)=>{assert.equal(key,request);saved=await response.text();}});
+  await Promise.all(tasks);
+  assert.equal(saved,'public asset');
  }
 });

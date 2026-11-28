@@ -36,9 +36,9 @@
     return workbook.SheetNames.map(name => ({ name, rows:window.XLSX.utils.sheet_to_json(workbook.Sheets[name], { header:1, raw:true, defval:'', blankrows:false }) }));
   }
   async function readWorkbook(file) {
-    const buffer = await file.arrayBuffer();
+    const [reader, buffer] = await Promise.all([window.loadWorkbookReader(), file.arrayBuffer()]);
     const extension = extensionOf(file);
-    if (extension !== 'csv' && extension !== 'tsv') return { workbook:window.XLSX.read(buffer, { type:'array', cellDates:true }), encoding:'' };
+    if (extension !== 'csv' && extension !== 'tsv') return { workbook:reader.read(buffer, { type:'array', cellDates:true }), encoding:'' };
     const utf8 = new TextDecoder('utf-8').decode(buffer);
     let content = utf8;
     let encoding = 'UTF-8';
@@ -46,7 +46,7 @@
       const big5 = new TextDecoder('big5').decode(buffer);
       if (csvTextScore(big5) > csvTextScore(utf8)) { content = big5; encoding = 'Big5'; }
     } catch (_) { /* Browser does not provide a Big5 decoder; retain UTF-8. */ }
-    return { workbook:window.XLSX.read(content, { type:'string', cellDates:true, FS:extension === 'tsv' ? '\t' : ',' }), encoding };
+    return { workbook:reader.read(content, { type:'string', cellDates:true, FS:extension === 'tsv' ? '\t' : ',' }), encoding };
   }
   function refreshPreview() {
     const ready = Boolean(state.stock);

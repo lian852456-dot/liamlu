@@ -218,11 +218,12 @@
   }
 
   async function readWorkbook(file, password) {
-    let bytes = await file.arrayBuffer();
+    const [crypto, buffer] = await Promise.all([window.loadWorkbookCrypto(), file.arrayBuffer()]);
+    let bytes = buffer;
     try {
-      if (window.OfficeCrypto?.isEncrypted(bytes)) {
+      if (crypto.isEncrypted(bytes)) {
         if (!password) throw new Error('請輸入 Excel 開啟密碼。');
-        bytes = arrayBufferFrom(await window.OfficeCrypto.decrypt(bytes, { password }));
+        bytes = arrayBufferFrom(await crypto.decrypt(bytes, { password }));
       }
       return XLSX.read(bytes, { type: 'array', cellDates: true });
     } catch (error) {

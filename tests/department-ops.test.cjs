@@ -64,10 +64,11 @@ test('入口、權限與密碼保護 Excel 元件均存在，公開頁不內嵌�
   const patrolBundle = fs.readFileSync(path.join(root, 'patrol-gas/PatrolCode.gs'), 'utf8');
   assert.match(home, /href="department-ops\.html"[\s\S]*北一二部｜部區管理/);
   assert.match(home, /href="gold-medal\.html"[\s\S]*北一二B 金牌明細/);
-  assert.match(page, /officecrypto\.bundle\.min\.js/);
+  assert.match(page, /src="workbook-reader\.js/);
+  assert.match(fs.readFileSync(path.join(root, 'workbook-reader.js'), 'utf8'), /officecrypto\.bundle\.min\.js/);
   assert.match(page, /department-ops-core\.js\?v=20260930-2/);
   assert.match(page, /session-read-manager\.js\?v=20261013-phase1-1/);
-  assert.match(page, /department-ops\.js\?v=20261125-conversion-1/);
+  assert.match(page, /department-ops\.js\?v=20261128-reader/);
   assert.match(page, /需要更新時才上傳助理月報原檔/);
   assert.match(page, /選檔僅供更新/);
   assert.match(page, /id="excelPassword"[^>]*placeholder="請輸入檔案密碼"/);

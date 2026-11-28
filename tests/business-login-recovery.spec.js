@@ -88,6 +88,19 @@ for(const entry of ['/home.html','/app.html'])for(const width of [1280,390]){
   expect(f.calls).toEqual(['employee_status','employee_status']);expect(await f.proof()).toBeNull();
  });
 }
+test('typing starts one anonymous probe and a fresh home login opens without a redundant session read',async({page})=>{
+ const f=await fixture(page,'ok',false);
+ expect(f.calls).toEqual([]);
+ await page.locator('[data-b-employee]').fill('SYNTH001');
+ await expect.poll(()=>f.calls.slice()).toEqual(['employee_status']);
+ await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
+ await page.locator('[data-b-submit]').click();
+ await expect(page.locator('#dashboard-b-access')).toHaveAttribute('data-state','active');
+ expect(f.calls).toEqual(['employee_status','employee_login']);
+ await page.locator('[data-b-refresh]').click();
+ await expect.poll(()=>f.calls.slice()).toEqual(['employee_status','employee_login','employee_session']);
+});
+
 test('SYNTHETIC failed pre-login service status never submits the employee ID or password',async({page})=>{
  const f=await fixture(page,'status-auth',false);
  await page.locator('[data-b-employee]').fill('SYNTH001');await page.locator('[data-b-password]').fill('SYNTHETIC_PASSWORD');
