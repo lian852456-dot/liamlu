@@ -56,22 +56,27 @@ self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith(CACHE_FAMILY) && key !== CACHE_NAME).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
-function networkFirstHtml(request) {
-  return fetch(request, { cache:'no-cache' }).then(response => {
-    if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-    return response;
-  }).catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')));
+function storePublicResponse(event, response) {
+  if (response.ok) {
+    // Clone before handing the stream to the page. The cache write can finish in the background.
+    const copy = response.clone();
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy)).catch(() => {}));
+  }
+  return response;
+}
+
+function networkFirstHtml(event) {
+  const request = event.request;
+  return fetch(request, { cache:'no-cache' }).then(response => storePublicResponse(event, response)).catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')));
 }
 
 // iOS may preserve a versioned script URL while an updated app shell is
 // installing. Prefer the deployed asset while online, and only fall back to
 // the same versioned shell file when the device is offline. This cache never
 // contains private API responses or credentials.
-function networkFirstShellAsset(request) {
-  return fetch(request, { cache:'no-cache' }).then(response => {
-    if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-    return response;
-  }).catch(() => caches.match(request, { ignoreSearch:true }));
+function networkFirstShellAsset(event) {
+  const request = event.request;
+  return fetch(request, { cache:'no-cache' }).then(response => storePublicResponse(event, response)).catch(() => caches.match(request, { ignoreSearch:true }));
 }
 
 function networkFirstTradeinAsset(request) {
@@ -119,11 +124,11 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (SHELL_PATHS.has(relativePath)) {
-    event.respondWith(networkFirstShellAsset(event.request));
+    event.respondWith(networkFirstShellAsset(event));
     return;
   }
   if (requestUrl.pathname.endsWith('/audit-report.html')) {
-    event.respondWith(networkFirstHtml(event.request));
+    event.respondWith(networkFirstHtml(event));
     return;
   }
   // All live HTML pages and top-level navigations must prefer the network.
@@ -131,7 +136,7 @@ self.addEventListener('fetch', event => {
   // cache-first route here can otherwise pin index.html / kpi.html / patrol.html
   // to an old build even after GitHub Pages has deployed a new version.
   if (event.request.mode === 'navigate' || requestUrl.pathname.endsWith('.html') || requestUrl.pathname.endsWith('/')) {
-    event.respondWith(networkFirstHtml(event.request));
+    event.respondWith(networkFirstHtml(event));
     return;
   }
   event.respondWith(

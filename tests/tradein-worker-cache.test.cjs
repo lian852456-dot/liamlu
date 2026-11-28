@@ -30,3 +30,23 @@ test('query interface assets prefer deployed code and never fall back across ver
   const offline=worker({asset,offline:true});assert.equal(await(await get(offline)).text(),'OLD_PARSER');assert.equal(await get(offline,offline.url.replace('v=old','v=new')),undefined);assert.equal(offline.matches.every(m=>m.options===undefined),true);
  }
 });
+
+test('entry pages and shared assets revalidate online and save a readable offline copy', async () => {
+ for (const asset of ['daily-log-dashboard.html','dashboard-b-shell.js?v=current']) {
+  const hooks = {}, tasks = [];
+  const request = {url:'https://example.test/liamlu/'+asset, method:'GET', mode:'cors'};
+  let releaseCache, saved, delivery;
+  const cacheReady = new Promise(resolve => { releaseCache = resolve; });
+  const context = vm.createContext({
+   URL, self:{location:{origin:'https://example.test'},registration:{scope:'https://example.test/liamlu/'},addEventListener:(name,fn)=>hooks[name]=fn},
+   fetch:async (_,options)=>{ assert.equal(options.cache,'no-cache'); return new Response('public asset'); },
+   caches:{open:()=>cacheReady,match:async()=>undefined}
+  });
+  vm.runInContext(fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),context);
+  hooks.fetch({request,respondWith:p=>{delivery=p;},waitUntil:p=>tasks.push(p)});
+  assert.equal(await (await delivery).text(),'public asset');
+  releaseCache({put:async (key,response)=>{assert.equal(key,request);saved=await response.text();}});
+  await Promise.all(tasks);
+  assert.equal(saved,'public asset');
+ }
+});
