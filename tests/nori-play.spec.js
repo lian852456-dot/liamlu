@@ -50,3 +50,64 @@ test('a second tap completes a high five or wakes the cat without closing the pa
   await expect(cat).toHaveAttribute('data-pose','walk');
   await expect(cat).toHaveAccessibleName('問海苔');
 });
+
+test('the closed cat plays all new idle poses between patrols without being clicked', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.addInitScript(() => { Math.random = () => 0; });
+  await page.goto(origin+'/home.html');
+  const cat = page.locator('#nori-toggle');
+  await expect(cat).toHaveAttribute('data-pose','walk');
+  await cat.evaluate(el => {
+    window.noriPoses = [];
+    new MutationObserver(() => window.noriPoses.push(el.dataset.pose))
+      .observe(el, {attributes:true, attributeFilter:['data-pose']});
+  });
+  const atlas = page.waitForResponse(origin+'/app-assets/nori-idle.webp');
+  await page.clock.runFor(4200);
+  await expect(cat).toHaveAttribute('data-pose','sit');
+  expect((await atlas).ok()).toBe(true);
+  await page.evaluate(async () => {
+    const image = new Image();
+    image.src = 'app-assets/nori-idle.webp';
+    await image.decode();
+  });
+  await page.clock.runFor(750);
+  await expect(cat).toHaveAttribute('data-pose','yawn');
+  const sprite = await cat.locator('.nori-cat').evaluate(el => {
+    const style = getComputedStyle(el, '::before');
+    return {image:style.backgroundImage, animation:style.animationName};
+  });
+  expect(sprite.image).toContain('nori-idle.webp');
+  expect(sprite.animation).toBe('nori-yawn');
+  await page.clock.runFor(66000);
+  const poses = await page.evaluate(() => window.noriPoses);
+  expect(poses).toEqual(expect.arrayContaining(['yawn','lookback','sniff','arch','scratch','loaf','groom','roll','sleep','stretch']));
+  expect(poses.filter(pose => pose === 'walk').length).toBeGreaterThanOrEqual(7);
+});
+
+test('opening the question panel or hiding the tab cancels the pending idle motion', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.addInitScript(() => { Math.random = () => 0; });
+  await page.goto(origin+'/home.html');
+  const cat = page.locator('#nori-toggle');
+  await page.clock.runFor(4200);
+  await expect(cat).toHaveAttribute('data-pose','sit');
+  await page.locator('#ask-nori').click();
+  await page.getByRole('textbox',{name:'向海苔提問'}).fill('本月門市 KPI');
+  await page.clock.runFor(15000);
+  await expect(cat).toHaveAttribute('data-pose','sit');
+  await expect(page.locator('#nori-question')).toHaveValue('本月門市 KPI');
+  await page.locator('#nori-close').click();
+  await expect(cat).toHaveAttribute('data-pose','walk');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', {configurable:true, value:true});
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.clock.runFor(15000);
+  await expect(cat).toHaveAttribute('data-pose','sit');
+  await page.evaluate(() => {
+    Reflect.deleteProperty(document, 'hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(cat).toHaveAttribute('data-pose','walk');
+});

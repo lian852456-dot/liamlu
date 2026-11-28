@@ -199,8 +199,19 @@
   const caption = toggle.querySelector('.nori-caption');
   const fiveButton = byId('nori-five');
   const napButton = byId('nori-nap');
-  const rests = ['sit', 'groom', 'stretch', 'roll', 'sleep'];
-  let restIndex = 0;
+  const idleRoutines = [
+    [['yawn', 1450], ['loaf', 2450]],
+    [['lookback', 1050], ['sit', 850]],
+    [['sniff', 1950], ['lookback', 1050]],
+    [['arch', 1550], ['stretch', 1650]],
+    [['scratch', 1850], ['groom', 1400]],
+    [['roll', 1800], ['loaf', 2150]],
+    [['loaf', 1700], ['sleep', 4300], ['stretch', 1650]]
+  ];
+  const idleWarmup = [['groom', 1550], ['stretch', 1650]];
+  let idleAtlas;
+  let remainingRoutines = [];
+  let lastRoutine;
   let poseTimer;
   let awaiting = '';
 
@@ -218,25 +229,40 @@
   }
   function resumeCat() {
     setInteraction();
-    setPose(panel.hidden ? 'walk' : 'sit');
+    setPose(panel.hidden && !document.hidden ? 'walk' : 'sit');
     if (!panel.hidden || document.hidden || motion.matches) return;
-    poseTimer = setTimeout(() => {
-      const pose = rests[restIndex];
-      restIndex = (restIndex + 1) % rests.length;
-      setPose(pose);
-      poseTimer = setTimeout(resumeCat, pose === 'sleep' ? 4800 : 2700);
-    }, 7500);
+    poseTimer = setTimeout(startIdleRoutine, 4200 + Math.random() * 2600);
   }
-  // Each gesture owns one timer. A new gesture, panel change or backgrounded tab
-  // cancels all remaining stages before they can replace the current pose.
+  function startIdleRoutine() {
+    // Load the optional atlas after the first patrol, while Nori sits down.
+    if (!idleAtlas) {
+      idleAtlas = new Image();
+      idleAtlas.fetchPriority = 'low';
+      idleAtlas.src = 'app-assets/nori-idle.webp';
+    }
+    setPose('sit');
+    poseTimer = setTimeout(() => {
+      if (!idleAtlas.complete || !idleAtlas.naturalWidth) {
+        playPoses(idleWarmup);
+        return;
+      }
+      if (!remainingRoutines.length) remainingRoutines = [...idleRoutines];
+      const choices = remainingRoutines.filter(routine => routine !== lastRoutine);
+      const routine = choices[Math.floor(Math.random() * choices.length)];
+      remainingRoutines.splice(remainingRoutines.indexOf(routine), 1);
+      lastRoutine = routine;
+      playPoses(routine);
+    }, 750);
+  }
+  // Idle routines and games share one cancellable timer.
+  function playPoses(steps, index = 0) {
+    const [pose, duration, message] = steps[index];
+    setPose(pose, message);
+    poseTimer = setTimeout(index + 1 < steps.length ? () => playPoses(steps, index + 1) : resumeCat, duration);
+  }
   function perform(play, steps) {
     setInteraction(play);
-    function next(index) {
-      const [pose, duration, message] = steps[index];
-      setPose(pose, message);
-      poseTimer = setTimeout(index + 1 < steps.length ? () => next(index + 1) : resumeCat, duration);
-    }
-    next(0);
+    playPoses(steps);
     for (const animation of toggle.getAnimations?.({subtree:true}) || []) {
       if (['nori-yarn', 'nori-snack', 'nori-spark'].includes(animation.animationName)) animation.currentTime = 0;
     }
@@ -277,7 +303,7 @@
   fiveButton?.addEventListener('click', highFive);
   napButton?.addEventListener('click', nap);
   document.addEventListener('visibilitychange', resumeCat);
-  window.addEventListener('pagehide', () => { clearTimeout(poseTimer); });
+  window.addEventListener('pagehide', () => setPose('sit'));
   window.addEventListener('pageshow', resumeCat);
   motion.addEventListener('change', resumeCat);
   resumeCat();
